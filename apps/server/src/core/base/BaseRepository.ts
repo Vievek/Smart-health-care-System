@@ -1,7 +1,6 @@
 import { Model } from "mongoose";
 import { IRepository } from "../interfaces/IRepository";
 
-// Simple approach that avoids complex type issues
 export abstract class BaseRepository<T> implements IRepository<T> {
   protected model: Model<any>;
 
@@ -10,29 +9,54 @@ export abstract class BaseRepository<T> implements IRepository<T> {
   }
 
   async findById(id: string): Promise<T | null> {
-    const result = await this.model.findById(id).lean();
-    return result as T | null;
+    try {
+      const result = await this.model.findById(id);
+      return result ? result.toObject() : null;
+    } catch (error) {
+      console.error(`Error in findById for ${this.model.modelName}:`, error);
+      return null;
+    }
   }
 
   async findAll(filter: any = {}): Promise<T[]> {
-    const results = await this.model.find(filter).lean();
-    return results as T[];
+    try {
+      const results = await this.model.find(filter);
+      return results.map((result: any) => result.toObject());
+    } catch (error) {
+      console.error(`Error in findAll for ${this.model.modelName}:`, error);
+      return [];
+    }
   }
 
   async create(entity: Partial<T>): Promise<T> {
-    const created = await this.model.create(entity);
-    return created.toObject() as T;
+    try {
+      const created = await this.model.create(entity);
+      return created.toObject();
+    } catch (error) {
+      console.error(`Error in create for ${this.model.modelName}:`, error);
+      throw error;
+    }
   }
 
   async update(id: string, entity: Partial<T>): Promise<T | null> {
-    const updated = await this.model
-      .findByIdAndUpdate(id, entity, { new: true })
-      .lean();
-    return updated as T | null;
+    try {
+      const updated = await this.model.findByIdAndUpdate(id, entity, {
+        new: true,
+      });
+      return updated ? updated.toObject() : null;
+    } catch (error) {
+      console.error(`Error in update for ${this.model.modelName}:`, error);
+      return null;
+    }
   }
 
   async delete(id: string): Promise<boolean> {
-    const result = await this.model.findByIdAndDelete(id);
-    return result !== null;
+    try {
+      const result = await this.model.findByIdAndDelete(id);
+      return result !== null;
+    } catch (error) {
+      console.error(`Error in delete for ${this.model.modelName}:`, error);
+      return false;
+    }
   }
 }

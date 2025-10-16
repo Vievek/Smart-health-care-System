@@ -8,6 +8,7 @@ import {
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Layout } from "./components/layout/Layout";
 import { Login } from "./components/auth/Login";
+import { Register } from "./components/auth/Register";
 import { MedicalRecordsDashboard } from "./components/medical-records/MedicalRecordsDashboard";
 import { AppointmentBooking } from "./components/appointments/AppointmentBooking";
 import { WardManagement } from "./components/wards/WardManagement";
@@ -20,13 +21,37 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
   return isAuthenticated ? <>{children}</> : <Navigate to="/login" />;
 };
 
+const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { isAuthenticated } = useAuth();
+  return !isAuthenticated ? (
+    <>{children}</>
+  ) : (
+    <Navigate to="/medical-records" />
+  );
+};
+
 const AppRoutes: React.FC = () => {
   const { user } = useAuth();
 
   return (
     <Layout>
       <Routes>
-        <Route path="/login" element={<Login />} />
+        <Route
+          path="/login"
+          element={
+            <PublicRoute>
+              <Login />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/register"
+          element={
+            <PublicRoute>
+              <Register />
+            </PublicRoute>
+          }
+        />
         <Route
           path="/medical-records"
           element={

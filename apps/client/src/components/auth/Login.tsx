@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom"; // Add Link import
 import { ApiService } from "../../core/services/ApiService";
 import { AuthService } from "../../core/services/AuthService";
 
@@ -92,6 +92,19 @@ export const Login: React.FC = () => {
             >
               {loading ? "Signing in..." : "Sign in"}
             </button>
+          </div>
+
+          {/* Add register link */}
+          <div className="text-center">
+            <p className="text-sm text-gray-600">
+              Don't have an account?{" "}
+              <Link
+                to="/register"
+                className="font-medium text-blue-600 hover:text-blue-500"
+              >
+                Sign up here
+              </Link>
+            </p>
           </div>
         </form>
       </div>

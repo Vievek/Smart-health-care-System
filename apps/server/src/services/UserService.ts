@@ -4,7 +4,11 @@ import { IService } from "../core/interfaces/IService.js";
 import bcrypt from "bcryptjs";
 
 export class UserService implements IService<IUser> {
-  constructor(private userRepository: UserRepository = new UserRepository()) {}
+  public userRepository: UserRepository; // Make it public so we can access it
+
+  constructor(userRepository: UserRepository = new UserRepository()) {
+    this.userRepository = userRepository;
+  }
 
   async getById(id: string): Promise<IUser | null> {
     return this.userRepository.findById(id);
@@ -41,6 +45,14 @@ export class UserService implements IService<IUser> {
 
     const isValid = await bcrypt.compare(password, user.passwordHash);
     return isValid ? user : null;
+  }
+
+  async findByNationalId(nationalId: string): Promise<IUser | null> {
+    return this.userRepository.findByNationalId(nationalId);
+  }
+
+  async findByEmail(email: string): Promise<IUser | null> {
+    return this.userRepository.findByEmail(email);
   }
 
   async createTemporaryJudicialAccess(judicialData: any): Promise<IUser> {

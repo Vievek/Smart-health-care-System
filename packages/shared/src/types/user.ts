@@ -72,5 +72,23 @@ export interface IWorkSchedule {
   isAvailable: boolean;
 }
 
+// Add these to the existing UserService interface in IApiService
+export interface RegisterData {
+  nationalId: string;
+  email: string;
+  phone: string;
+  firstName: string;
+  lastName: string;
+  password: string;
+  address: string;
+  role: UserRole;
+  dateOfBirth?: string;
+  gender?: string;
+  emergencyContact?: string;
+  insuranceInfo?: string;
+  specialization?: string;
+  licenseNumber?: string;
+}
+
 // Export User type alias
 export type User = IUser;

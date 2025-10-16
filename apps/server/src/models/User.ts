@@ -12,6 +12,7 @@ import {
   IWardClerk,
 } from "@shared/healthcare-types";
 
+// Base User Schema
 const userSchema = new Schema<IUser>(
   {
     nationalId: { type: String, required: true, unique: true },
@@ -19,7 +20,11 @@ const userSchema = new Schema<IUser>(
     phone: { type: String, required: true },
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
-    role: { type: String, enum: Object.values(UserRole), required: true },
+    role: {
+      type: String,
+      enum: Object.values(UserRole),
+      required: true,
+    },
     status: {
       type: String,
       enum: Object.values(UserStatus),
@@ -34,68 +39,92 @@ const userSchema = new Schema<IUser>(
   }
 );
 
+// Create the base User model
 export const User = mongoose.model<IUser>("User", userSchema);
 
+// Patient Schema
+const patientSchema = new Schema<IPatient>({
+  dateOfBirth: { type: Date, required: true },
+  gender: {
+    type: String,
+    enum: ["male", "female", "other"],
+    required: true,
+  },
+  emergencyContact: { type: String, required: true },
+  insuranceInfo: String,
+  dependents: [{ type: String }],
+});
+
+// Doctor Schema
+const doctorSchema = new Schema<IDoctor>({
+  specialization: { type: String, required: true },
+  licenseNumber: { type: String, required: true, unique: true },
+  schedule: [
+    {
+      dayOfWeek: Number,
+      startTime: String,
+      endTime: String,
+      isAvailable: Boolean,
+    },
+  ],
+});
+
+// Nurse Schema
+const nurseSchema = new Schema<INurse>({
+  wardAssigned: { type: String, required: true },
+});
+
+// Ward Clerk Schema
+const wardClerkSchema = new Schema<IWardClerk>({
+  department: { type: String, required: true },
+});
+
+// Pharmacist Schema
+const pharmacistSchema = new Schema<IPharmacist>({
+  licenseNumber: { type: String, required: true, unique: true },
+});
+
+// Administrator Schema
+const administratorSchema = new Schema<IAdministrator>({
+  permissions: [{ type: String }],
+});
+
+// Judicial Member Schema
+const judicialMemberSchema = new Schema<IJudicialMember>({
+  legalDocumentReference: { type: String, required: true },
+  accessExpiry: { type: Date, required: true },
+  approvedBy: String,
+});
+
+// Create discriminators for each role
 export const Patient = User.discriminator<IPatient>(
-  "Patient",
-  new Schema({
-    dateOfBirth: { type: Date, required: true },
-    gender: { type: String, enum: ["male", "female", "other"], required: true },
-    emergencyContact: { type: String, required: true },
-    insuranceInfo: String,
-    dependents: [String],
-  })
+  UserRole.PATIENT,
+  patientSchema
 );
 
 export const Doctor = User.discriminator<IDoctor>(
-  "Doctor",
-  new Schema({
-    specialization: { type: String, required: true },
-    licenseNumber: { type: String, required: true, unique: true },
-    schedule: [
-      {
-        dayOfWeek: Number,
-        startTime: String,
-        endTime: String,
-        isAvailable: Boolean,
-      },
-    ],
-  })
+  UserRole.DOCTOR,
+  doctorSchema
 );
 
-export const Nurse = User.discriminator<INurse>(
-  "Nurse",
-  new Schema({
-    wardAssigned: { type: String, required: true },
-  })
-);
+export const Nurse = User.discriminator<INurse>(UserRole.NURSE, nurseSchema);
 
 export const WardClerk = User.discriminator<IWardClerk>(
-  "WardClerk",
-  new Schema({
-    department: { type: String, required: true },
-  })
+  UserRole.WARD_CLERK,
+  wardClerkSchema
 );
 
 export const Pharmacist = User.discriminator<IPharmacist>(
-  "Pharmacist",
-  new Schema({
-    licenseNumber: { type: String, required: true, unique: true },
-  })
+  UserRole.PHARMACIST,
+  pharmacistSchema
 );
 
 export const Administrator = User.discriminator<IAdministrator>(
-  "Administrator",
-  new Schema({
-    permissions: [{ type: String }],
-  })
+  UserRole.ADMIN,
+  administratorSchema
 );
 
 export const JudicialMember = User.discriminator<IJudicialMember>(
-  "JudicialMember",
-  new Schema({
-    legalDocumentReference: { type: String, required: true },
-    accessExpiry: { type: Date, required: true },
-    approvedBy: String,
-  })
+  UserRole.JUDICIAL,
+  judicialMemberSchema
 );
