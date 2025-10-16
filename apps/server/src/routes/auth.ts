@@ -2,7 +2,7 @@ import { Router } from "express";
 import { UserService } from "../services/UserService.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { UserRole } from "@shared/healthcare-types";
+import { UserRole, IPatient, IDoctor } from "@shared/healthcare-types";
 
 const router = Router();
 
@@ -153,16 +153,29 @@ router.post("/register", async (req, res) => {
 
     console.log("User created successfully:", user._id);
 
+    // Create response with user data (including role-specific fields)
+    const userResponse: any = {
+      _id: user._id,
+      nationalId: user.nationalId,
+      email: user.email,
+      phone: user.phone,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      role: user.role,
+      address: user.address,
+    };
+
+    // Add role-specific fields to response
+    if (role === UserRole.PATIENT) {
+      userResponse.dateOfBirth = (user as any).dateOfBirth;
+      userResponse.gender = (user as any).gender;
+    } else if (role === UserRole.DOCTOR) {
+      userResponse.specialization = (user as any).specialization;
+    }
+
     res.status(201).json({
       token,
-      user: {
-        _id: user._id,
-        nationalId: user.nationalId,
-        email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        role: user.role,
-      },
+      user: userResponse,
     });
   } catch (error: any) {
     console.error("Registration error details:", error);

@@ -13,24 +13,31 @@ export const Login: React.FC = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    setError("");
+ const handleSubmit = async (e: React.FormEvent) => {
+   e.preventDefault();
+   setLoading(true);
+   setError("");
 
-    try {
-      const apiService = new ApiService("http://localhost:5000/api");
-      const authService = new AuthService(apiService);
+   try {
+     const apiService = new ApiService("http://localhost:5000/api");
+     const authService = new AuthService(apiService);
 
-      const response = await authService.login({ nationalId, password });
-      login(response.token, response.user);
-      navigate("/medical-records");
-    } catch (err: any) {
-      setError(err.response?.data?.error || "Login failed");
-    } finally {
-      setLoading(false);
-    }
-  };
+     console.log("Attempting login with:", { nationalId });
+     const response = await authService.login({ nationalId, password });
+     console.log("Login response received:", response);
+
+     login(response.token, response.user);
+     console.log("Auth context updated, navigating...");
+     navigate("/medical-records");
+   } catch (err: any) {
+     console.error("Login error details:", err);
+     const errorMessage =
+       err.response?.data?.error || err.message || "Login failed";
+     setError(errorMessage);
+   } finally {
+     setLoading(false);
+   }
+ };
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">

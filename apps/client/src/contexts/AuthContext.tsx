@@ -32,26 +32,36 @@ interface AuthProviderProps {
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<IUser | null>(null);
 
-  useEffect(() => {
-    const token = localStorage.getItem("authToken");
-    const userData = localStorage.getItem("user");
+ useEffect(() => {
+   const token = localStorage.getItem("authToken");
+   const userData = localStorage.getItem("user");
 
-    if (token && userData) {
-      try {
-        setUser(JSON.parse(userData));
-      } catch (error) {
-        console.error("Failed to parse user data:", error);
-        localStorage.removeItem("authToken");
-        localStorage.removeItem("user");
-      }
-    }
-  }, []);
+   if (token && userData) {
+     try {
+       const parsedUser = JSON.parse(userData);
+       // Validate that we have the required user fields
+       if (parsedUser && parsedUser._id && parsedUser.role) {
+         setUser(parsedUser);
+       } else {
+         console.warn("Invalid user data in storage");
+         logout(); // Clear invalid data
+       }
+     } catch (error) {
+       console.error("Failed to parse user data:", error);
+       logout(); // Clear corrupted data
+     }
+   }
+ }, []);
 
-  const login = (token: string, userData: IUser) => {
-    localStorage.setItem("authToken", token);
-    localStorage.setItem("user", JSON.stringify(userData));
-    setUser(userData);
-  };
+ const login = (token: string, userData: IUser) => {
+   try {
+     localStorage.setItem("authToken", token);
+     localStorage.setItem("user", JSON.stringify(userData));
+     setUser(userData);
+   } catch (error) {
+     console.error("Failed to save auth data:", error);
+   }
+ };
 
   const logout = () => {
     localStorage.removeItem("authToken");

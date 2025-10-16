@@ -31,9 +31,17 @@ export class ApiService implements IApiService {
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
+        console.error(
+          "API Error:",
+          error.response?.status,
+          error.response?.data
+        );
+
         if (error.response?.status === 401) {
+          console.log("Authentication failed, clearing tokens");
           localStorage.removeItem("authToken");
-          window.location.href = "/login";
+          localStorage.removeItem("user");
+          // Don't redirect automatically, let the component handle it
         }
         return Promise.reject(error);
       }

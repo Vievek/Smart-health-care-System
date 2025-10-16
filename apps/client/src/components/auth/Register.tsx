@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { useAuth } from "../../contexts/AuthContext";
 import { useNavigate, Link } from "react-router-dom";
 import { ApiService } from "../../core/services/ApiService";
-import { AuthService } from "../../core/services/AuthService";
 import { UserRole } from "@shared/healthcare-types";
 
 export const Register: React.FC = () => {
@@ -78,20 +77,18 @@ export const Register: React.FC = () => {
         registrationData.licenseNumber = formData.licenseNumber;
       }
 
-      // Remove the unused response variable - just make the API call
-      await apiService.post("/auth/register", registrationData);
+      // Register the user and get the response with proper typing
+      const response = await apiService.post<{ token: string; user: any }>(
+        "/auth/register",
+        registrationData
+      );
 
-      // Auto-login after registration
-      const authService = new AuthService(apiService);
-      const loginResponse = await authService.login({
-        nationalId: formData.nationalId,
-        password: formData.password,
-      });
-
-      login(loginResponse.token, loginResponse.user);
+      // Use the token and user from the registration response directly
+      login(response.token, response.user);
       navigate("/medical-records");
     } catch (err: any) {
       setError(err.response?.data?.error || "Registration failed");
+      console.error("Registration error:", err);
     } finally {
       setLoading(false);
     }
