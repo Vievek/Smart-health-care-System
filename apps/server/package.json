@@ -2,7 +2,7 @@
   "name": "healthcare-server",
   "type": "module",
   "scripts": {
-    "dev": "nodemon --loader ts-node/esm src/index.ts",
+    "dev": "nodemon --exec \"node --loader ts-node/esm\" src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "build:dev": "npm run build && npm start",
