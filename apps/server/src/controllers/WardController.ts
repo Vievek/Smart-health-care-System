@@ -101,4 +101,43 @@ export class WardController {
       res.status(500).json({ error: "Failed to fetch wards" });
     }
   };
+
+  getBedsByWard = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const { wardId } = req.params;
+      const beds = await this.wardService.getBedsByWard(wardId);
+      res.json(beds);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch beds" });
+    }
+  };
+
+  getBedsByPatient = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const { patientId } = req.params;
+      const beds = await this.wardService.getBedsByPatient(patientId);
+      res.json(beds);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch patient beds" });
+    }
+  };
+
+  // Fixed: Remove unused 'req' parameter or prefix with underscore
+  getAllBeds = async (_req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const beds = await this.wardService.getAllBeds();
+      res.json(beds);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch all beds" });
+    }
+  };
+
+  createWard = async (req: AuthRequest, res: Response): Promise<void> => {
+    try {
+      const ward = await this.wardService.create(req.body);
+      res.status(201).json(ward);
+    } catch (error) {
+      res.status(400).json({ error: (error as Error).message });
+    }
+  };
 }

@@ -136,4 +136,35 @@ export class AppointmentController {
       res.status(400).json({ error: (error as Error).message });
     }
   };
+
+  // New method to get appointment by ID
+  getAppointmentById = async (
+    req: AuthRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const appointment = await this.appointmentService.getById(req.params.id);
+
+      if (!appointment) {
+        res.status(404).json({ error: "Appointment not found" });
+        return;
+      }
+
+      // Check if user has access to this appointment
+      const user = req.user!;
+      if (user.role === "patient" && appointment.patientId !== user._id) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+
+      if (user.role === "doctor" && appointment.doctorId !== user._id) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+
+      res.json(appointment);
+    } catch (error) {
+      res.status(500).json({ error: "Failed to fetch appointment" });
+    }
+  };
 }

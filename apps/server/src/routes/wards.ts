@@ -6,7 +6,15 @@ const router = Router();
 const wardController = new WardController();
 
 router.get("/", authenticate, wardController.getWards);
+router.post("/", authenticate, authorize("admin"), wardController.createWard);
+router.get("/beds", authenticate, wardController.getAllBeds);
 router.get("/beds/available", authenticate, wardController.getAvailableBeds);
+router.get("/beds/ward/:wardId", authenticate, wardController.getBedsByWard);
+router.get(
+  "/beds/patient/:patientId",
+  authenticate,
+  wardController.getBedsByPatient
+);
 router.post(
   "/beds/allocate",
   authenticate,

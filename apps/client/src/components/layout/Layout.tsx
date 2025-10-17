@@ -31,7 +31,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         name: "Ward Management",
         href: "/wards",
         icon: Bed,
-        roles: ["nurse", "ward_clerk", "admin"],
+        roles: ["nurse", "ward_clerk", "admin", "patient"], // Added patient for bed view
       },
       {
         name: "Pharmacy",
@@ -53,16 +53,28 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     navigate("/login");
   };
 
-  // Redirect unauthorized users
+  // Redirect unauthorized users to their default page
   React.useEffect(() => {
     const currentPath = location.pathname;
 
     if (user) {
-      // Check if current path is accessible by user role
+      // If user tries to access a route they don't have access to, redirect them
       const navItem = navigation.find((item) => item.href === currentPath);
       if (!navItem && currentPath !== "/medical-records") {
-        // Redirect to medical records if trying to access unauthorized section
-        navigate("/medical-records");
+        // Redirect to appropriate default page based on role
+        let defaultRoute = "/medical-records";
+
+        if (user.role === "nurse" || user.role === "ward_clerk") {
+          defaultRoute = "/wards";
+        } else if (user.role === "pharmacist") {
+          defaultRoute = "/pharmacy";
+        } else if (user.role === "patient") {
+          defaultRoute = "/medical-records";
+        } else if (user.role === "doctor") {
+          defaultRoute = "/appointments";
+        }
+
+        navigate(defaultRoute);
       }
     }
   }, [user, location, navigate, navigation]);
@@ -137,4 +149,3 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     </div>
   );
 };
-

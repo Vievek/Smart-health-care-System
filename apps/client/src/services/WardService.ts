@@ -5,9 +5,13 @@ import { ApiService } from "../core/services/ApiService";
 export interface IWardService {
   getWards(): Promise<IWard[]>;
   getAvailableBeds(wardType?: string): Promise<IBed[]>;
+  getAllBeds(): Promise<IBed[]>;
+  getBedsByWard(wardId: string): Promise<IBed[]>;
+  getBedsByPatient(patientId: string): Promise<IBed[]>;
   allocateBed(bedId: string, patientId: string): Promise<IBed>;
   transferPatient(currentBedId: string, newBedId: string): Promise<IBed>;
   dischargePatient(bedId: string): Promise<IBed>;
+  createWard(data: any): Promise<IWard>;
 }
 
 export class WardService implements IWardService {
@@ -43,6 +47,47 @@ export class WardService implements IWardService {
     }
   }
 
+  async getAllBeds(): Promise<IBed[]> {
+    try {
+      const beds = await this.apiService.get<IBed[]>("/wards/beds");
+      console.log("WardService: Loaded all beds:", beds.length);
+      return beds;
+    } catch (error) {
+      console.error("WardService: Failed to load all beds:", error);
+      throw error;
+    }
+  }
+
+  async getBedsByWard(wardId: string): Promise<IBed[]> {
+    try {
+      const beds = await this.apiService.get<IBed[]>(
+        `/wards/beds/ward/${wardId}`
+      );
+      console.log("WardService: Loaded beds for ward:", wardId, beds.length);
+      return beds;
+    } catch (error) {
+      console.error("WardService: Failed to load beds by ward:", error);
+      throw error;
+    }
+  }
+
+  async getBedsByPatient(patientId: string): Promise<IBed[]> {
+    try {
+      const beds = await this.apiService.get<IBed[]>(
+        `/wards/beds/patient/${patientId}`
+      );
+      console.log(
+        "WardService: Loaded beds for patient:",
+        patientId,
+        beds.length
+      );
+      return beds;
+    } catch (error) {
+      console.error("WardService: Failed to load beds by patient:", error);
+      throw error;
+    }
+  }
+
   async allocateBed(bedId: string, patientId: string): Promise<IBed> {
     try {
       const result = await this.apiService.post<IBed>("/wards/beds/allocate", {
@@ -58,13 +103,40 @@ export class WardService implements IWardService {
   }
 
   async transferPatient(currentBedId: string, newBedId: string): Promise<IBed> {
-    return this.apiService.post<IBed>("/wards/beds/transfer", {
-      currentBedId,
-      newBedId,
-    });
+    try {
+      const result = await this.apiService.post<IBed>("/wards/beds/transfer", {
+        currentBedId,
+        newBedId,
+      });
+      console.log("WardService: Patient transferred successfully");
+      return result;
+    } catch (error) {
+      console.error("WardService: Failed to transfer patient:", error);
+      throw error;
+    }
   }
 
   async dischargePatient(bedId: string): Promise<IBed> {
-    return this.apiService.post<IBed>("/wards/beds/discharge", { bedId });
+    try {
+      const result = await this.apiService.post<IBed>("/wards/beds/discharge", {
+        bedId,
+      });
+      console.log("WardService: Patient discharged successfully");
+      return result;
+    } catch (error) {
+      console.error("WardService: Failed to discharge patient:", error);
+      throw error;
+    }
+  }
+
+  async createWard(data: any): Promise<IWard> {
+    try {
+      const result = await this.apiService.post<IWard>("/wards", data);
+      console.log("WardService: Ward created successfully");
+      return result;
+    } catch (error) {
+      console.error("WardService: Failed to create ward:", error);
+      throw error;
+    }
   }
 }

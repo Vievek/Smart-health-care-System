@@ -17,6 +17,15 @@ export class MedicalRecordController {
       const { patientId } = req.query;
       const user = req.user!;
 
+      console.log(
+        "Getting records for user:",
+        user._id,
+        "role:",
+        user.role,
+        "patientId:",
+        patientId
+      );
+
       let records;
       if (user.role === "patient") {
         records = await this.medicalRecordService.getPatientRecords(
@@ -24,6 +33,7 @@ export class MedicalRecordController {
           user.role
         );
       } else if (patientId) {
+        // For doctors/pharmacists searching for specific patient
         records = await this.medicalRecordService.getPatientRecords(
           patientId as string,
           user.role
@@ -31,6 +41,8 @@ export class MedicalRecordController {
       } else {
         records = await this.medicalRecordService.getAll(req.query);
       }
+
+      console.log("Found records:", records.length);
 
       await this.auditService.logAccess(
         user._id!.toString(),
@@ -42,6 +54,7 @@ export class MedicalRecordController {
 
       res.json(records);
     } catch (error) {
+      console.error("Error in getRecords:", error);
       await this.auditService.logAccess(
         req.user!._id!.toString(),
         "medical_records",
@@ -153,6 +166,58 @@ export class MedicalRecordController {
         { error: (error as Error).message }
       );
       res.status(500).json({ error: "Failed to create prescription" });
+    }
+  };
+
+  // New method to get prescriptions by patient ID
+  getPrescriptionsByPatient = async (
+    req: AuthRequest,
+    res: Response
+  ): Promise<void> => {
+    try {
+      const { patientId } = req.params;
+      const user = req.user!;
+
+      console.log(
+        "Getting prescriptions for patient:",
+        patientId,
+        "by user:",
+        user._id
+      );
+
+      // Check authorization
+      if (user.role === "patient" && user._id !== patientId) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
+
+      const records = await this.medicalRecordService.getPatientRecords(
+        patientId,
+        user.role
+      );
+
+      // Filter only prescriptions
+      const prescriptions = records.filter(
+        (record) =>
+          record.recordType === "prescription" &&
+          record.prescription?.status === "active"
+      );
+
+      console.log("Found prescriptions:", prescriptions.length);
+
+      await this.auditService.logAccess(
+        user._id!.toString(),
+        "prescriptions",
+        "view_patient",
+        req.ip!,
+        "success",
+        { patientId }
+      );
+
+      res.json(prescriptions);
+    } catch (error) {
+      console.error("Error in getPrescriptionsByPatient:", error);
+      res.status(500).json({ error: "Failed to fetch prescriptions" });
     }
   };
 }

@@ -1,6 +1,7 @@
-import { IMedicalRecord } from "@shared/healthcare-types";
+import { IMedicalRecord, MedicalRecordType } from "@shared/healthcare-types";
 import { MedicalRecordRepository } from "../repositories/MedicalRecordRepository";
 import { IService } from "../core/interfaces/IService";
+import PDFDocument from "pdfkit";
 
 export class MedicalRecordService implements IService<IMedicalRecord> {
   constructor(
@@ -32,9 +33,17 @@ export class MedicalRecordService implements IService<IMedicalRecord> {
 
   async getPatientRecords(
     patientId: string,
-    _userRole: string // Prefix with underscore to indicate unused parameter
+    userRole: string
   ): Promise<IMedicalRecord[]> {
-    // Authorization logic based on role would be implemented here
+    // Authorization logic based on role
+    if (userRole === "patient") {
+      // Patients can only see their own records
+      return this.medicalRecordRepo.findByPatientId(patientId);
+    } else if (userRole === "doctor") {
+      // Doctors can see any patient's records
+      return this.medicalRecordRepo.findByPatientId(patientId);
+    }
+    // Other roles need specific permissions
     return this.medicalRecordRepo.findByPatientId(patientId);
   }
 
@@ -45,14 +54,70 @@ export class MedicalRecordService implements IService<IMedicalRecord> {
   async createPrescription(prescriptionData: any): Promise<IMedicalRecord> {
     return this.create({
       ...prescriptionData,
-      recordType: "prescription",
+      recordType: MedicalRecordType.PRESCRIPTION,
       title: `Prescription - ${new Date().toLocaleDateString()}`,
     });
   }
 
   async generateRecordPDF(recordId: string): Promise<Buffer> {
-    // PDF generation logic would be implemented here
-    // For now, return a simple buffer
-    return Buffer.from(`PDF for record ${recordId}`);
+    return new Promise(async (resolve, reject) => {
+      try {
+        const record = await this.getById(recordId);
+        if (!record) {
+          throw new Error("Record not found");
+        }
+
+        const doc = new PDFDocument();
+        const buffers: Buffer[] = [];
+
+        doc.on("data", buffers.push.bind(buffers));
+        doc.on("end", () => {
+          const pdfData = Buffer.concat(buffers);
+          resolve(pdfData);
+        });
+
+        // Add content to PDF
+        doc.fontSize(20).text("Medical Record", { align: "center" });
+        doc.moveDown();
+
+        doc.fontSize(12);
+        doc.text(`Patient ID: ${record.patientId}`);
+        doc.text(`Record Type: ${record.recordType}`);
+        doc.text(`Title: ${record.title}`);
+        doc.text(
+          `Created Date: ${new Date(record.createdDate).toLocaleDateString()}`
+        );
+        doc.text(`Author ID: ${record.authorId}`);
+
+        if (record.description) {
+          doc.moveDown();
+          doc.text(`Description: ${record.description}`);
+        }
+
+        if (record.prescription) {
+          doc.moveDown();
+          doc.text("Prescription Details:");
+          record.prescription.medications.forEach((med, index) => {
+            doc.text(
+              `${index + 1}. ${med.name} - ${med.dosage} (${
+                med.frequency
+              }) for ${med.duration}`
+            );
+          });
+        }
+
+        if (record.labResults) {
+          doc.moveDown();
+          doc.text("Lab Results:");
+          Object.entries(record.labResults.results).forEach(([key, value]) => {
+            doc.text(`${key}: ${value} ${record.labResults?.units[key] || ""}`);
+          });
+        }
+
+        doc.end();
+      } catch (error) {
+        reject(error);
+      }
+    });
   }
 }

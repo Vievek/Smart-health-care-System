@@ -6,6 +6,7 @@ const router = Router();
 const appointmentController = new AppointmentController();
 
 router.get("/", authenticate, appointmentController.getAppointments);
+router.get("/:id", authenticate, appointmentController.getAppointmentById);
 router.post(
   "/",
   authenticate,

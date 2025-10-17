@@ -8,8 +8,15 @@ import {
 } from "../ui/card";
 import { Button } from "../ui/button";
 import { WardService } from "../../services/WardService";
-import { IWard, IBed, BedStatus, WardType } from "@shared/healthcare-types";
-import { Bed, Search, Filter, MapPin, User, Loader2 } from "lucide-react";
+import {
+  IWard,
+  IBed,
+  BedStatus,
+  WardType,
+  UserRole,
+} from "@shared/healthcare-types";
+import { Bed, Search, Filter, MapPin, User, Loader2, Plus } from "lucide-react";
+import { useAuth } from "../../contexts/AuthContext";
 
 export const WardManagement: React.FC = () => {
   const [wards, setWards] = useState<IWard[]>([]);
@@ -18,15 +25,21 @@ export const WardManagement: React.FC = () => {
   const [selectedWard, setSelectedWard] = useState<IWard | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAllocationModal, setShowAllocationModal] = useState(false);
+  const [showAddWardModal, setShowAddWardModal] = useState(false);
   const [selectedBed, setSelectedBed] = useState<IBed | null>(null);
   const [loading, setLoading] = useState(false);
+  const [patientBeds, setPatientBeds] = useState<IBed[]>([]);
 
+  const { user } = useAuth();
   const wardService = new WardService();
 
   useEffect(() => {
     loadWards();
     loadAllBeds();
-  }, []);
+    if (user?.role === UserRole.PATIENT) {
+      loadPatientBeds();
+    }
+  }, [user]);
 
   const loadWards = async () => {
     try {
@@ -46,53 +59,23 @@ export const WardManagement: React.FC = () => {
       const availableData = await wardService.getAvailableBeds();
       setAvailableBeds(availableData);
 
-      // Load all beds by getting beds for each ward
-      const allBedsData: IBed[] = [];
-      const wardsData = await wardService.getWards();
-
-      for (const ward of wardsData) {
-        // In a real app, you'd have an API endpoint to get beds by ward
-        // For now, we'll use the available beds and mock some additional data
-        const wardBeds = availableData.filter((bed) => bed.wardId === ward._id);
-        allBedsData.push(...wardBeds);
-      }
-
-      // Add some mock occupied beds for demonstration
-      // In a real app, this would come from the API
-      const mockBeds: IBed[] = [
-        {
-          _id: "bed1",
-          bedNumber: "ICU-01",
-          wardId: wardsData[0]?._id || "ward1",
-          bedType: WardType.ICU,
-          status: BedStatus.OCCUPIED,
-          patientId: "PAT001",
-          features: [],
-        },
-        {
-          _id: "bed4",
-          bedNumber: "GW-01",
-          wardId: wardsData[1]?._id || "ward2",
-          bedType: WardType.GENERAL,
-          status: BedStatus.OCCUPIED,
-          patientId: "PAT002",
-          features: [],
-        },
-        {
-          _id: "bed6",
-          bedNumber: "GW-03",
-          wardId: wardsData[1]?._id || "ward2",
-          bedType: WardType.GENERAL,
-          status: BedStatus.MAINTENANCE,
-          features: [],
-        },
-      ];
-
-      setAllBeds([...allBedsData, ...mockBeds]);
+      const allBedsData = await wardService.getAllBeds();
+      setAllBeds(allBedsData);
     } catch (error) {
       console.error("Failed to load beds:", error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadPatientBeds = async () => {
+    try {
+      if (user?._id) {
+        const beds = await wardService.getBedsByPatient(user._id);
+        setPatientBeds(beds);
+      }
+    } catch (error) {
+      console.error("Failed to load patient beds:", error);
     }
   };
 
@@ -136,6 +119,18 @@ export const WardManagement: React.FC = () => {
     }
   };
 
+  const handleCreateWard = async (wardData: any) => {
+    try {
+      await wardService.createWard(wardData);
+      await loadWards();
+      setShowAddWardModal(false);
+      alert("Ward created successfully!");
+    } catch (error: any) {
+      console.error("Failed to create ward:", error);
+      alert(`Failed to create ward: ${error.message}`);
+    }
+  };
+
   const getBedsForWard = (wardId: string) => {
     return allBeds.filter((bed) => bed.wardId === wardId);
   };
@@ -157,24 +152,106 @@ export const WardManagement: React.FC = () => {
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
 
-  return (
-    <div className="container mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Ward & Bed Management
-          </h1>
-          <p className="text-gray-600 mt-2">
-            Manage patient bed allocations and ward occupancy
-          </p>
-        </div>
-        <Button className="bg-blue-600 hover:bg-blue-700">
-          <Bed className="w-4 h-4 mr-2" />
-          Add New Ward
-        </Button>
-      </div>
+  // Patient View Component
+  const PatientBedView = () => (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center">
+            <Bed className="w-5 h-5 mr-2" />
+            My Bed Allocation
+          </CardTitle>
+          <CardDescription>
+            View your current bed assignment and ward information
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {patientBeds.length === 0 ? (
+            <div className="text-center py-8">
+              <Bed className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+              <p className="text-gray-500">No bed allocation found.</p>
+              <p className="text-sm text-gray-400 mt-2">
+                Please contact hospital staff for bed assignment.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {patientBeds.map((bed) => {
+                const ward = wards.find((w) => w._id === bed.wardId);
+                return (
+                  <Card key={bed._id} className="bg-blue-50 border-blue-200">
+                    <CardContent className="p-6">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                            <Bed className="w-6 h-6 text-blue-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold text-lg">
+                              Bed {bed.bedNumber}
+                            </h3>
+                            <p className="text-blue-600">
+                              {ward?.name} • {bed.bedType}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              Status:{" "}
+                              <span className="text-green-600 font-medium">
+                                Occupied
+                              </span>
+                            </p>
+                          </div>
+                        </div>
+                        <div className="text-right">
+                          <p className="text-sm text-gray-500">Patient ID</p>
+                          <p className="font-semibold">{user?._id}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
+      {/* Ward Overview for Patient */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Hospital Wards Overview</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {wards.map((ward) => {
+              const wardBeds = getBedsForWard(ward._id!);
+              const availableBedsCount = wardBeds.filter(
+                (bed) => bed.status === BedStatus.AVAILABLE
+              ).length;
+
+              return (
+                <Card key={ward._id} className="text-center p-4">
+                  <h4 className="font-semibold">{ward.name}</h4>
+                  <p className="text-sm text-gray-600 capitalize">
+                    {ward.type}
+                  </p>
+                  <div className="mt-2">
+                    <p className="text-2xl font-bold text-blue-600">
+                      {availableBedsCount}
+                    </p>
+                    <p className="text-xs text-gray-500">Available Beds</p>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+
+  // Staff View Component
+  const StaffWardView = () => (
+    <>
       {/* Search and Stats */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         <Card className="lg:col-span-3">
@@ -288,6 +365,19 @@ export const WardManagement: React.FC = () => {
           );
         })}
       </div>
+
+      {/* Add Ward Button for Admin */}
+      {user?.role === UserRole.ADMIN && (
+        <div className="flex justify-end">
+          <Button
+            className="bg-green-600 hover:bg-green-700"
+            onClick={() => setShowAddWardModal(true)}
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add New Ward
+          </Button>
+        </div>
+      )}
 
       {/* Bed Management */}
       {selectedWard && (
@@ -416,6 +506,42 @@ export const WardManagement: React.FC = () => {
           }}
         />
       )}
+
+      {/* Add Ward Modal */}
+      {showAddWardModal && (
+        <AddWardModal
+          onClose={() => setShowAddWardModal(false)}
+          onCreate={handleCreateWard}
+        />
+      )}
+    </>
+  );
+
+  return (
+    <div className="container mx-auto p-6 space-y-6">
+      {/* Header */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">
+            {user?.role === UserRole.PATIENT
+              ? "My Bed Information"
+              : "Ward & Bed Management"}
+          </h1>
+          <p className="text-gray-600 mt-2">
+            {user?.role === UserRole.PATIENT
+              ? "View your current bed assignment"
+              : "Manage patient bed allocations and ward occupancy"}
+          </p>
+        </div>
+        {user?.role !== UserRole.PATIENT && user?.role !== UserRole.ADMIN && (
+          <Button className="bg-blue-600 hover:bg-blue-700">
+            <Bed className="w-4 h-4 mr-2" />
+            Add New Ward
+          </Button>
+        )}
+      </div>
+
+      {user?.role === UserRole.PATIENT ? <PatientBedView /> : <StaffWardView />}
     </div>
   );
 };
@@ -490,6 +616,102 @@ const BedAllocationModal: React.FC<{
               Cancel
             </Button>
             <Button type="submit">Allocate Bed</Button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+// Add Ward Modal Component
+const AddWardModal: React.FC<{
+  onClose: () => void;
+  onCreate: (wardData: any) => void;
+}> = ({ onClose, onCreate }) => {
+  const [wardData, setWardData] = useState({
+    name: "",
+    type: WardType.GENERAL,
+    capacity: 10,
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onCreate(wardData);
+  };
+
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setWardData((prev) => ({
+      ...prev,
+      [name]: name === "capacity" ? parseInt(value) : value,
+    }));
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-lg max-w-md w-full">
+        <div className="p-6 border-b">
+          <h2 className="text-xl font-bold">Add New Ward</h2>
+          <p className="text-gray-600 mt-1">Create a new hospital ward</p>
+        </div>
+
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Ward Name *
+            </label>
+            <input
+              type="text"
+              name="name"
+              value={wardData.name}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              placeholder="e.g., Emergency Ward A"
+              required
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Ward Type *
+            </label>
+            <select
+              name="type"
+              value={wardData.type}
+              onChange={handleChange}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required
+            >
+              <option value={WardType.GENERAL}>General</option>
+              <option value={WardType.ICU}>ICU</option>
+              <option value={WardType.PRIVATE}>Private</option>
+              <option value={WardType.EMERGENCY}>Emergency</option>
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-2">
+              Capacity *
+            </label>
+            <input
+              type="number"
+              name="capacity"
+              value={wardData.capacity}
+              onChange={handleChange}
+              min="1"
+              max="100"
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              required
+            />
+          </div>
+
+          <div className="flex justify-end space-x-3 pt-4">
+            <Button type="button" variant="outline" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button type="submit">Create Ward</Button>
           </div>
         </form>
       </div>

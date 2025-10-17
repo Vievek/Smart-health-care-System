@@ -23,6 +23,7 @@ import {
   MapPin,
   Search,
   Loader2,
+  X,
 } from "lucide-react";
 
 export const AppointmentBooking: React.FC = () => {
@@ -32,8 +33,8 @@ export const AppointmentBooking: React.FC = () => {
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
   const [appointments, setAppointments] = useState<IAppointment[]>([]);
   const [step, setStep] = useState<
-    "select-doctor" | "select-slot" | "confirmation"
-  >("select-doctor");
+    "select-doctor" | "select-slot" | "confirmation" | "my-appointments"
+  >("my-appointments");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
@@ -120,7 +121,7 @@ export const AppointmentBooking: React.FC = () => {
       });
 
       // Show success message and reset
-      setStep("select-doctor");
+      setStep("my-appointments");
       setSelectedDoctor(null);
       setSelectedDate(null);
       setSelectedSlot(null);
@@ -138,6 +139,19 @@ export const AppointmentBooking: React.FC = () => {
       );
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCancelAppointment = async (appointmentId: string) => {
+    if (!confirm("Are you sure you want to cancel this appointment?")) return;
+
+    try {
+      await appointmentService.cancelAppointment(appointmentId);
+      await loadAppointments();
+      alert("Appointment cancelled successfully!");
+    } catch (error: any) {
+      console.error("Failed to cancel appointment:", error);
+      alert("Failed to cancel appointment. Please try again.");
     }
   };
 
@@ -196,6 +210,16 @@ export const AppointmentBooking: React.FC = () => {
     return date;
   });
 
+  // Filter appointments based on user role
+  const userAppointments = appointments.filter((apt) => {
+    if (user?.role === "patient") {
+      return apt.patientId === user._id;
+    } else if (user?.role === "doctor") {
+      return apt.doctorId === user._id;
+    }
+    return true;
+  });
+
   if (loading && doctors.length === 0) {
     return (
       <div className="container mx-auto p-6">
@@ -210,11 +234,28 @@ export const AppointmentBooking: React.FC = () => {
   return (
     <div className="container mx-auto p-6 space-y-6">
       {/* Header */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900">Book Appointment</h1>
-        <p className="text-gray-600 mt-2">
-          Schedule your visit with our healthcare professionals
-        </p>
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900">
+            {user?.role === "doctor"
+              ? "Doctor Appointments"
+              : "Appointment Management"}
+          </h1>
+          <p className="text-gray-600 mt-2">
+            {user?.role === "doctor"
+              ? "Manage your patient appointments"
+              : "Schedule and manage your appointments"}
+          </p>
+        </div>
+        {user?.role === "patient" && (
+          <Button
+            className="bg-blue-600 hover:bg-blue-700"
+            onClick={() => setStep("select-doctor")}
+          >
+            <Calendar className="w-4 h-4 mr-2" />
+            Book New Appointment
+          </Button>
+        )}
       </div>
 
       {error && (
@@ -223,40 +264,143 @@ export const AppointmentBooking: React.FC = () => {
         </div>
       )}
 
+      {/* My Appointments View */}
+      {step === "my-appointments" && (
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Calendar className="w-5 h-5 mr-2" />
+                {user?.role === "doctor"
+                  ? "Your Appointments"
+                  : "My Appointments"}
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {userAppointments.length === 0 ? (
+                <div className="text-center py-8">
+                  <Calendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-500">
+                    {user?.role === "doctor"
+                      ? "No appointments scheduled yet."
+                      : "You have no appointments. Book your first appointment!"}
+                  </p>
+                  {user?.role === "patient" && (
+                    <Button
+                      className="mt-4"
+                      onClick={() => setStep("select-doctor")}
+                    >
+                      Book Appointment
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {userAppointments.map((appointment) => (
+                    <Card key={appointment._id} className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-4">
+                          <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center">
+                            <User className="w-6 h-6 text-blue-600" />
+                          </div>
+                          <div>
+                            <h3 className="font-semibold">
+                              {user?.role === "doctor"
+                                ? `Patient: ${appointment.patientId}`
+                                : `Dr. ${
+                                    doctors.find(
+                                      (d) => d._id === appointment.doctorId
+                                    )?.firstName
+                                  } ${
+                                    doctors.find(
+                                      (d) => d._id === appointment.doctorId
+                                    )?.lastName
+                                  }`}
+                            </h3>
+                            <p className="text-sm text-gray-600">
+                              {new Date(appointment.dateTime).toLocaleString()}{" "}
+                              • {appointment.reason}
+                            </p>
+                            <span
+                              className={`inline-block px-2 py-1 rounded-full text-xs font-medium ${
+                                appointment.status ===
+                                AppointmentStatus.CONFIRMED
+                                  ? "bg-green-100 text-green-800"
+                                  : appointment.status ===
+                                    AppointmentStatus.PENDING
+                                  ? "bg-yellow-100 text-yellow-800"
+                                  : appointment.status ===
+                                    AppointmentStatus.CANCELLED
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-gray-100 text-gray-800"
+                              }`}
+                            >
+                              {appointment.status}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex space-x-2">
+                          {user?.role === "patient" &&
+                            appointment.status !==
+                              AppointmentStatus.CANCELLED && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  handleCancelAppointment(appointment._id!)
+                                }
+                              >
+                                <X className="w-4 h-4 mr-1" />
+                                Cancel
+                              </Button>
+                            )}
+                        </div>
+                      </div>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Booking Steps */}
-      <div className="flex items-center justify-center mb-8">
-        <div className="flex items-center space-x-4">
-          {["Select Doctor", "Choose Time", "Confirm"].map(
-            (stepName, index) => (
-              <React.Fragment key={stepName}>
-                <div
-                  className={`flex items-center ${
-                    (index === 0 && step === "select-doctor") ||
-                    (index === 1 && step === "select-slot") ||
-                    (index === 2 && step === "confirmation")
-                      ? "text-blue-600"
-                      : "text-gray-400"
-                  }`}
-                >
+      {step !== "my-appointments" && (
+        <div className="flex items-center justify-center mb-8">
+          <div className="flex items-center space-x-4">
+            {["Select Doctor", "Choose Time", "Confirm"].map(
+              (stepName, index) => (
+                <React.Fragment key={stepName}>
                   <div
-                    className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                    className={`flex items-center ${
                       (index === 0 && step === "select-doctor") ||
                       (index === 1 && step === "select-slot") ||
                       (index === 2 && step === "confirmation")
-                        ? "bg-blue-600 text-white"
-                        : "bg-gray-200"
+                        ? "text-blue-600"
+                        : "text-gray-400"
                     }`}
                   >
-                    {index + 1}
+                    <div
+                      className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                        (index === 0 && step === "select-doctor") ||
+                        (index === 1 && step === "select-slot") ||
+                        (index === 2 && step === "confirmation")
+                          ? "bg-blue-600 text-white"
+                          : "bg-gray-200"
+                      }`}
+                    >
+                      {index + 1}
+                    </div>
+                    <span className="ml-2 font-medium">{stepName}</span>
                   </div>
-                  <span className="ml-2 font-medium">{stepName}</span>
-                </div>
-                {index < 2 && <div className="w-12 h-0.5 bg-gray-300"></div>}
-              </React.Fragment>
-            )
-          )}
+                  {index < 2 && <div className="w-12 h-0.5 bg-gray-300"></div>}
+                </React.Fragment>
+              )
+            )}
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Step 1: Select Doctor */}
       {step === "select-doctor" && (
@@ -287,6 +431,12 @@ export const AppointmentBooking: React.FC = () => {
                     </option>
                   ))}
                 </select>
+                <Button
+                  variant="outline"
+                  onClick={() => setStep("my-appointments")}
+                >
+                  View My Appointments
+                </Button>
               </div>
             </CardContent>
           </Card>
@@ -364,12 +514,20 @@ export const AppointmentBooking: React.FC = () => {
                     </p>
                   </div>
                 </div>
-                <Button
-                  variant="outline"
-                  onClick={() => setStep("select-doctor")}
-                >
-                  Change Doctor
-                </Button>
+                <div className="flex space-x-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setStep("select-doctor")}
+                  >
+                    Change Doctor
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => setStep("my-appointments")}
+                  >
+                    View Appointments
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>

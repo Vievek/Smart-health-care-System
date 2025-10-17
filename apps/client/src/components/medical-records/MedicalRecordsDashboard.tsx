@@ -17,6 +17,7 @@ import {
   User,
   Search,
   Eye,
+  Filter,
 } from "lucide-react";
 
 interface MedicalRecordsDashboardProps {
@@ -33,6 +34,7 @@ export const MedicalRecordsDashboard: React.FC<
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [patientSearchId, setPatientSearchId] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
 
   const medicalRecordService = new MedicalRecordService();
 
@@ -82,10 +84,30 @@ export const MedicalRecordsDashboard: React.FC<
     loadRecords();
   };
 
+  const handleDateFilter = (days: number) => {
+    if (days === 0) {
+      setDateFilter("");
+      loadRecords();
+      return;
+    }
+
+    const filterDate = new Date();
+    filterDate.setDate(filterDate.getDate() - days);
+    setDateFilter(filterDate.toISOString());
+
+    // Filter records locally
+    const filtered = records.filter(
+      (record) => new Date(record.createdDate) >= filterDate
+    );
+    setRecords(filtered);
+  };
+
   const filteredRecords = records.filter(
     (record) =>
       record.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      record.recordType.toLowerCase().includes(searchTerm.toLowerCase())
+      record.recordType.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (record.description &&
+        record.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
 
   if (loading) {
@@ -122,7 +144,7 @@ export const MedicalRecordsDashboard: React.FC<
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
               <input
                 type="text"
-                placeholder="Search records by title or type..."
+                placeholder="Search records by title, type, or description..."
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
@@ -150,12 +172,20 @@ export const MedicalRecordsDashboard: React.FC<
             </form>
           )}
 
-          {userRole === UserRole.PATIENT && (
-            <Button variant="outline">
-              <Calendar className="w-4 h-4 mr-2" />
-              Filter by Date
-            </Button>
-          )}
+          {/* Date Filter */}
+          <div className="flex items-center space-x-2">
+            <Filter className="w-4 h-4 text-gray-500" />
+            <select
+              value={dateFilter}
+              onChange={(e) => handleDateFilter(parseInt(e.target.value))}
+              className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+            >
+              <option value="0">All Dates</option>
+              <option value="7">Last 7 days</option>
+              <option value="30">Last 30 days</option>
+              <option value="90">Last 90 days</option>
+            </select>
+          </div>
         </div>
       </div>
 

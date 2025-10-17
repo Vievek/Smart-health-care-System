@@ -107,4 +107,17 @@ export class WardService implements IService<IWard> {
   async getAvailableBeds(wardType?: string): Promise<IBed[]> {
     return this.bedRepo.findAvailableBeds(wardType);
   }
+
+  async getBedsByWard(wardId: string): Promise<IBed[]> {
+    return this.bedRepo.findByWardId(wardId);
+  }
+
+  async getBedsByPatient(patientId: string): Promise<IBed[]> {
+    const bed = await this.bedRepo.findByPatientId(patientId);
+    return bed ? [bed] : [];
+  }
+
+  async getAllBeds(): Promise<IBed[]> {
+    return this.bedRepo.findAll();
+  }
 }

@@ -12,6 +12,11 @@ router.get(
   authenticate,
   medicalRecordController.downloadRecordPDF
 );
+router.get(
+  "/patient/:patientId/prescriptions",
+  authenticate,
+  medicalRecordController.getPrescriptionsByPatient
+);
 router.post(
   "/prescriptions",
   authenticate,

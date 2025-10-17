@@ -7,6 +7,7 @@ export interface IMedicalRecordService {
   getRecordById(id: string): Promise<IMedicalRecord>;
   downloadRecordPDF(id: string): Promise<Blob>;
   createPrescription(data: any): Promise<IMedicalRecord>;
+  getPrescriptionsByPatient(patientId: string): Promise<IMedicalRecord[]>;
 }
 
 export class MedicalRecordService implements IMedicalRecordService {
@@ -62,5 +63,26 @@ export class MedicalRecordService implements IMedicalRecordService {
       "/medical-records/prescriptions",
       data
     );
+  }
+
+  async getPrescriptionsByPatient(
+    patientId: string
+  ): Promise<IMedicalRecord[]> {
+    try {
+      const prescriptions = await this.apiService.get<IMedicalRecord[]>(
+        `/medical-records/patient/${patientId}/prescriptions`
+      );
+      console.log(
+        "MedicalRecordService: Loaded prescriptions:",
+        prescriptions.length
+      );
+      return prescriptions;
+    } catch (error) {
+      console.error(
+        "MedicalRecordService: Failed to load prescriptions:",
+        error
+      );
+      throw error;
+    }
   }
 }
