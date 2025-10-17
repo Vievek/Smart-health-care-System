@@ -35,15 +35,24 @@ export class MedicalRecordService implements IService<IMedicalRecord> {
     patientId: string,
     userRole: string
   ): Promise<IMedicalRecord[]> {
-    // Authorization logic based on role
+    console.log(`Getting records for patient: ${patientId}, role: ${userRole}`);
+
+    // For patients, only return their own records
     if (userRole === "patient") {
-      // Patients can only see their own records
-      return this.medicalRecordRepo.findByPatientId(patientId);
-    } else if (userRole === "doctor") {
-      // Doctors can see any patient's records
-      return this.medicalRecordRepo.findByPatientId(patientId);
+      const records = await this.medicalRecordRepo.findByPatientId(patientId);
+      console.log(`Found ${records.length} records for patient ${patientId}`);
+      return records;
     }
-    // Other roles need specific permissions
+    // For doctors and other roles, return patient records
+    else if (userRole === "doctor" || userRole === "pharmacist") {
+      const records = await this.medicalRecordRepo.findByPatientId(patientId);
+      console.log(
+        `Found ${records.length} records for patient ${patientId} (viewed by ${userRole})`
+      );
+      return records;
+    }
+
+    // Default fallback
     return this.medicalRecordRepo.findByPatientId(patientId);
   }
 
@@ -57,6 +66,26 @@ export class MedicalRecordService implements IService<IMedicalRecord> {
       recordType: MedicalRecordType.PRESCRIPTION,
       title: `Prescription - ${new Date().toLocaleDateString()}`,
     });
+  }
+
+  async getPrescriptionsByPatient(
+    patientId: string
+  ): Promise<IMedicalRecord[]> {
+    console.log(`Getting prescriptions for patient: ${patientId}`);
+    try {
+      const prescriptions =
+        await this.medicalRecordRepo.findPrescriptionsByPatient(patientId);
+      console.log(
+        `Found ${prescriptions.length} prescriptions for patient ${patientId}`
+      );
+      return prescriptions;
+    } catch (error) {
+      console.error(
+        `Error getting prescriptions for patient ${patientId}:`,
+        error
+      );
+      throw error;
+    }
   }
 
   async generateRecordPDF(recordId: string): Promise<Buffer> {

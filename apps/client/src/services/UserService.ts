@@ -6,7 +6,7 @@ export interface IUserService {
   getDoctors(): Promise<IUser[]>;
   getDoctorById(id: string): Promise<IUser | null>;
   getUsersByRole(role: UserRole): Promise<IUser[]>;
-  getAll(): Promise<IUser[]>; // Add this method
+  getAll(): Promise<IUser[]>;
 }
 
 export class UserService implements IUserService {
@@ -29,9 +29,11 @@ export class UserService implements IUserService {
   async getDoctors(): Promise<IUser[]> {
     try {
       const allUsers = await this.apiService.get<IUser[]>("/users");
-      return allUsers.filter(
+      const doctors = allUsers.filter(
         (user) => user.role === UserRole.DOCTOR && user.status === "active"
       );
+      console.log(`Found ${doctors.length} doctors`);
+      return doctors;
     } catch (error) {
       console.error("Failed to fetch doctors:", error);
       throw error;
@@ -51,9 +53,11 @@ export class UserService implements IUserService {
   async getUsersByRole(role: UserRole): Promise<IUser[]> {
     try {
       const allUsers = await this.apiService.get<IUser[]>("/users");
-      return allUsers.filter(
+      const filteredUsers = allUsers.filter(
         (user) => user.role === role && user.status === "active"
       );
+      console.log(`Found ${filteredUsers.length} users with role ${role}`);
+      return filteredUsers;
     } catch (error) {
       console.error(`Failed to fetch users with role ${role}:`, error);
       throw error;

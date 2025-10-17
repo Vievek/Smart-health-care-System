@@ -30,8 +30,14 @@ export class WardService implements IService<IWard> {
   }
 
   async allocateBed(bedId: string, patientId: string): Promise<IBed | null> {
+    console.log(`Allocating bed ${bedId} to patient ${patientId}`);
+
     const bed = await this.bedRepo.findById(bedId);
-    if (!bed || bed.status !== BedStatus.AVAILABLE) {
+    if (!bed) {
+      throw new Error("Bed not found");
+    }
+
+    if (bed.status !== BedStatus.AVAILABLE) {
       throw new Error("Bed not available");
     }
 
@@ -52,13 +58,19 @@ export class WardService implements IService<IWard> {
     currentBedId: string,
     newBedId: string
   ): Promise<IBed | null> {
+    console.log(`Transferring patient from bed ${currentBedId} to ${newBedId}`);
+
     const currentBed = await this.bedRepo.findById(currentBedId);
-    if (!currentBed) throw new Error("Current bed not found");
+    if (!currentBed || !currentBed.patientId) {
+      throw new Error("Current bed not found or no patient assigned");
+    }
 
     const newBed = await this.bedRepo.findById(newBedId);
     if (!newBed || newBed.status !== BedStatus.AVAILABLE) {
       throw new Error("New bed not available");
     }
+
+    const patientId = currentBed.patientId;
 
     // Free current bed
     await this.bedRepo.update(currentBedId, {
@@ -68,7 +80,7 @@ export class WardService implements IService<IWard> {
 
     // Allocate new bed
     const updatedBed = await this.bedRepo.update(newBedId, {
-      patientId: currentBed.patientId,
+      patientId: patientId,
       status: BedStatus.OCCUPIED,
     } as Partial<IBed>);
 
@@ -82,8 +94,12 @@ export class WardService implements IService<IWard> {
   }
 
   async dischargePatient(bedId: string): Promise<IBed | null> {
+    console.log(`Discharging patient from bed ${bedId}`);
+
     const bed = await this.bedRepo.findById(bedId);
-    if (!bed) throw new Error("Bed not found");
+    if (!bed) {
+      throw new Error("Bed not found");
+    }
 
     const updatedBed = await this.bedRepo.update(bedId, {
       patientId: undefined,

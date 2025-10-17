@@ -293,7 +293,7 @@ export const WardManagement: React.FC = () => {
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <input
                   type="text"
-                  placeholder="Search patient by ID, name, or admission number..."
+                  placeholder="Search beds by number or patient..."
                   className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
@@ -325,7 +325,7 @@ export const WardManagement: React.FC = () => {
       </div>
 
       {/* Wards Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {wards.map((ward) => {
           const wardBeds = getBedsForWard(ward._id!);
           const occupiedBeds = wardBeds.filter(
@@ -360,16 +360,14 @@ export const WardManagement: React.FC = () => {
                 </CardTitle>
                 <CardDescription className="flex items-center">
                   <MapPin className="w-4 h-4 mr-1" />
-                  Floor 2, Wing A
+                  {occupiedBeds} occupied, {availableBedsCount} available
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-2">
                   <div className="flex justify-between text-sm">
                     <span>Capacity:</span>
-                    <span className="font-semibold">
-                      {wardBeds.length} beds
-                    </span>
+                    <span className="font-semibold">{ward.capacity} beds</span>
                   </div>
                   <div className="flex justify-between text-sm">
                     <span>Occupied:</span>
@@ -388,7 +386,7 @@ export const WardManagement: React.FC = () => {
                   <div
                     className="bg-blue-600 h-2 rounded-full"
                     style={{
-                      width: `${(occupiedBeds / wardBeds.length) * 100}%`,
+                      width: `${(occupiedBeds / ward.capacity) * 100}%`,
                     }}
                   ></div>
                 </div>
@@ -406,6 +404,9 @@ export const WardManagement: React.FC = () => {
               <div className="flex items-center">
                 <Bed className="w-5 h-5 mr-2" />
                 {selectedWard.name} - Bed Management
+                <span className="ml-4 text-sm font-normal text-gray-600">
+                  ({getBedsForWard(selectedWard._id!).length} beds)
+                </span>
               </div>
               <div className="flex space-x-2">
                 <Button
@@ -470,11 +471,11 @@ export const WardManagement: React.FC = () => {
                       </p>
                       {bed.patientId && (
                         <div className="mt-2">
-                          <div className="flex items-center justify-center text-xs text-gray-600">
+                          <div className="flex items-center justify-center text-xs text-gray-600 mb-2">
                             <User className="w-3 h-3 mr-1" />
                             {getPatientName(bed.patientId)}
                           </div>
-                          <div className="flex justify-center space-x-1 mt-2">
+                          <div className="flex justify-center space-x-1">
                             <Button
                               size="sm"
                               variant="outline"
