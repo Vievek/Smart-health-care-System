@@ -55,7 +55,7 @@ export const PatientBedView: React.FC<PatientBedViewProps> = ({
         </CardContent>
       </Card>
 
-      <WardOverview wards={wards} />
+      <WardOverview wards={wards} patientBeds={patientBeds} />
     </div>
   );
 };
@@ -111,29 +111,48 @@ const BedAssignmentList: React.FC<{
   </div>
 );
 
-const WardOverview: React.FC<{ wards: IWard[] }> = ({ wards }) => (
-  <Card>
-    <CardHeader>
-      <CardTitle>Hospital Wards Overview</CardTitle>
-    </CardHeader>
-    <CardContent>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {wards.map((ward) => {
-          const availableBedsCount = Math.floor(Math.random() * ward.capacity); // Mock data
-          return (
+const WardOverview: React.FC<{ wards: IWard[]; patientBeds: IBed[] }> = ({
+  wards,
+  patientBeds,
+}) => {
+  // Calculate available beds for each ward
+  const wardStats = wards.map((ward) => {
+    const wardBeds = patientBeds.filter((bed) => bed.wardId === ward._id);
+    const availableBedsCount = Math.max(0, ward.capacity - wardBeds.length);
+
+    return {
+      ...ward,
+      availableBedsCount,
+      occupiedBeds: wardBeds.length,
+    };
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Hospital Wards Overview</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {wardStats.map((ward) => (
             <Card key={ward._id} className="text-center p-4">
               <h4 className="font-semibold">{ward.name}</h4>
               <p className="text-sm text-gray-600 capitalize">{ward.type}</p>
               <div className="mt-2">
                 <p className="text-2xl font-bold text-blue-600">
-                  {availableBedsCount}
+                  {ward.availableBedsCount}
                 </p>
                 <p className="text-xs text-gray-500">Available Beds</p>
               </div>
+              <div className="mt-1">
+                <p className="text-sm text-gray-600">
+                  {ward.occupiedBeds} occupied of {ward.capacity}
+                </p>
+              </div>
             </Card>
-          );
-        })}
-      </div>
-    </CardContent>
-  </Card>
-);
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+};

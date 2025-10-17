@@ -14,8 +14,7 @@ import {
   WardType,
   IUser,
 } from "@shared/healthcare-types";
-import { Bed, Filter, Loader2, MapPin } from "lucide-react";
-import { SearchBar } from "../common/SearchBar";
+import { Bed, Filter, Loader2, MapPin, Search } from "lucide-react";
 import { BedAllocationModal } from "./BedAllocationModal";
 import { TransferPatientModal } from "./TransferPatientModal";
 import { WardService } from "../../services/WardService";
@@ -27,6 +26,8 @@ interface StaffWardViewProps {
   selectedWard: IWard | null;
   searchTerm: string;
   patients: IUser[];
+  getPatientName: (patientId: string) => string;
+  getBedsForWard: (wardId: string) => IBed[];
   onSelectWard: (ward: IWard) => void;
   onSearchChange: (term: string) => void;
   onRefresh: () => void;
@@ -34,11 +35,12 @@ interface StaffWardViewProps {
 
 export const StaffWardView: React.FC<StaffWardViewProps> = ({
   wards,
-  allBeds,
   availableBeds,
   selectedWard,
   searchTerm,
   patients,
+  getPatientName,
+  getBedsForWard,
   onSelectWard,
   onSearchChange,
   onRefresh,
@@ -56,6 +58,7 @@ export const StaffWardView: React.FC<StaffWardViewProps> = ({
       await wardService.allocateBed(bedId, patientId);
       await onRefresh();
       setShowAllocationModal(false);
+      setSelectedBed(null);
       alert("Bed allocated successfully!");
     } catch (error: any) {
       alert(`Failed to allocate bed: ${error.message}`);
@@ -73,6 +76,7 @@ export const StaffWardView: React.FC<StaffWardViewProps> = ({
       await wardService.transferPatient(currentBedId, newBedId);
       await onRefresh();
       setShowTransferModal(false);
+      setSelectedBed(null);
       alert("Patient transferred successfully");
     } catch (error: any) {
       alert(`Failed to transfer patient: ${error.message}`);
@@ -94,16 +98,17 @@ export const StaffWardView: React.FC<StaffWardViewProps> = ({
     }
   };
 
-  const getBedsForWard = (wardId: string) => {
-    return allBeds.filter((bed) => bed.wardId === wardId);
-  };
-
-  const getPatientName = (patientId: string) => {
-    const patient = patients.find((p) => p._id === patientId);
-    return patient
-      ? `${patient.firstName} ${patient.lastName}`
-      : `Patient ${patientId}`;
-  };
+  // FIXED: Filter beds based on search term
+  const filteredBeds = selectedWard
+    ? getBedsForWard(selectedWard._id!).filter(
+        (bed) =>
+          bed.bedNumber.toString().includes(searchTerm) ||
+          (bed.patientId &&
+            getPatientName(bed.patientId)
+              .toLowerCase()
+              .includes(searchTerm.toLowerCase()))
+      )
+    : [];
 
   return (
     <div className="container mx-auto p-6 space-y-6">
@@ -125,7 +130,7 @@ export const StaffWardView: React.FC<StaffWardViewProps> = ({
       {selectedWard && (
         <BedManagement
           ward={selectedWard}
-          beds={getBedsForWard(selectedWard._id!)}
+          beds={filteredBeds}
           getPatientName={getPatientName}
           onRefresh={onRefresh}
           onAllocateBed={(bed) => {
@@ -192,12 +197,16 @@ const SearchAndStats: React.FC<{
     <Card className="lg:col-span-3">
       <CardContent className="p-4">
         <div className="flex items-center space-x-4">
-          <SearchBar
-            value={searchTerm}
-            onChange={onSearchChange}
-            placeholder="Search beds by number or patient..."
-            className="flex-1"
-          />
+          <div className="flex-1 relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            <input
+              type="text"
+              placeholder="Search beds by number or patient..."
+              className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              value={searchTerm}
+              onChange={(e) => onSearchChange(e.target.value)}
+            />
+          </div>
           <Button variant="outline">
             <Filter className="w-4 h-4 mr-2" />
             Filter
@@ -259,16 +268,20 @@ const WardCard: React.FC<{
   availableBeds: number;
   onSelect: (ward: IWard) => void;
 }> = ({ ward, isSelected, occupiedBeds, availableBeds, onSelect }) => {
+  // FIXED: Use only the WardType values that actually exist
   const getWardTypeColor = (type: WardType) => {
     switch (type) {
       case WardType.ICU:
         return "bg-red-100 text-red-800";
       case WardType.GENERAL:
         return "bg-blue-100 text-blue-800";
+      // Remove PEDIATRIC and MATERNITY since they don't exist in the enum
       default:
         return "bg-green-100 text-green-800";
     }
   };
+
+  const occupancyPercentage = (occupiedBeds / ward.capacity) * 100;
 
   return (
     <Card
@@ -299,6 +312,12 @@ const WardCard: React.FC<{
           occupiedBeds={occupiedBeds}
           availableBeds={availableBeds}
         />
+        <div className="mt-4 w-full bg-gray-200 rounded-full h-2">
+          <div
+            className="bg-blue-600 h-2 rounded-full transition-all duration-300"
+            style={{ width: `${occupancyPercentage}%` }}
+          ></div>
+        </div>
       </CardContent>
     </Card>
   );
@@ -309,28 +328,20 @@ const WardStats: React.FC<{
   occupiedBeds: number;
   availableBeds: number;
 }> = ({ capacity, occupiedBeds, availableBeds }) => (
-  <>
-    <div className="space-y-2">
-      <div className="flex justify-between text-sm">
-        <span>Capacity:</span>
-        <span className="font-semibold">{capacity} beds</span>
-      </div>
-      <div className="flex justify-between text-sm">
-        <span>Occupied:</span>
-        <span className="font-semibold text-red-600">{occupiedBeds}</span>
-      </div>
-      <div className="flex justify-between text-sm">
-        <span>Available:</span>
-        <span className="font-semibold text-green-600">{availableBeds}</span>
-      </div>
+  <div className="space-y-2">
+    <div className="flex justify-between text-sm">
+      <span>Capacity:</span>
+      <span className="font-semibold">{capacity} beds</span>
     </div>
-    <div className="mt-4 w-full bg-gray-200 rounded-full h-2">
-      <div
-        className="bg-blue-600 h-2 rounded-full"
-        style={{ width: `${(occupiedBeds / capacity) * 100}%` }}
-      ></div>
+    <div className="flex justify-between text-sm">
+      <span>Occupied:</span>
+      <span className="font-semibold text-red-600">{occupiedBeds}</span>
     </div>
-  </>
+    <div className="flex justify-between text-sm">
+      <span>Available:</span>
+      <span className="font-semibold text-green-600">{availableBeds}</span>
+    </div>
+  </div>
 );
 
 const BedManagement: React.FC<{
@@ -369,19 +380,26 @@ const BedManagement: React.FC<{
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
-          {beds.map((bed) => (
-            <BedCard
-              key={bed._id}
-              bed={bed}
-              getPatientName={getPatientName}
-              onAllocate={onAllocateBed}
-              onTransfer={onTransferPatient}
-              onDischarge={onDischargePatient}
-              actionLoading={actionLoading}
-            />
-          ))}
-        </div>
+        {beds.length === 0 ? (
+          <div className="text-center py-8">
+            <Bed className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+            <p className="text-gray-500">No beds found in this ward.</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+            {beds.map((bed) => (
+              <BedCard
+                key={bed._id}
+                bed={bed}
+                getPatientName={getPatientName}
+                onAllocate={onAllocateBed}
+                onTransfer={onTransferPatient}
+                onDischarge={onDischargePatient}
+                actionLoading={actionLoading}
+              />
+            ))}
+          </div>
+        )}
       </CardContent>
     </Card>
   );
