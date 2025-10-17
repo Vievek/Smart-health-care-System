@@ -9,10 +9,13 @@ import {
 import { Button } from "../ui/button";
 import { PharmacyService } from "../../services/PharmacyService";
 import { MedicalRecordService } from "../../services/MedicalRecordService";
+import { UserService } from "../../services/UserService";
 import {
   IInventoryItem,
   IMedicalRecord,
   PrescriptionStatus,
+  IUser,
+  UserRole,
 } from "@shared/healthcare-types";
 import {
   Pill,
@@ -32,19 +35,24 @@ export const PharmacyDispensing: React.FC = () => {
   const [showNewOrderModal, setShowNewOrderModal] = useState(false);
   const [selectedPrescription, setSelectedPrescription] =
     useState<IMedicalRecord | null>(null);
-  const [patientId, setPatientId] = useState("");
+  const [patientSearchTerm, setPatientSearchTerm] = useState("");
   const [patientPrescriptions, setPatientPrescriptions] = useState<
     IMedicalRecord[]
   >([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [patients, setPatients] = useState<IUser[]>([]);
+  const [selectedPatient, setSelectedPatient] = useState<IUser | null>(null);
+  const [showPatientSearch, setShowPatientSearch] = useState(false);
 
   const pharmacyService = new PharmacyService();
   const medicalRecordService = new MedicalRecordService();
+  const userService = new UserService();
 
   useEffect(() => {
     loadInventory();
+    loadPatients();
   }, []);
 
   const loadInventory = async () => {
@@ -56,17 +64,29 @@ export const PharmacyDispensing: React.FC = () => {
     }
   };
 
+  const loadPatients = async () => {
+    try {
+      const allUsers = await userService.getAll();
+      const patientUsers = allUsers.filter((u) => u.role === UserRole.PATIENT);
+      setPatients(patientUsers);
+    } catch (error) {
+      console.error("Failed to load patients:", error);
+    }
+  };
+
   const handleSearchPatient = async () => {
-    if (!patientId.trim()) {
-      alert("Please enter a patient ID");
+    if (!selectedPatient) {
+      alert("Please select a patient first");
       return;
     }
 
     try {
       setLoading(true);
-      // FIXED: Use the correct method to get prescriptions
+      // Use the patient ID to get prescriptions
       const prescriptions =
-        await medicalRecordService.getPrescriptionsByPatient(patientId);
+        await medicalRecordService.getPrescriptionsByPatient(
+          selectedPatient._id!
+        );
       setPatientPrescriptions(prescriptions);
 
       if (prescriptions.length === 0) {
@@ -82,7 +102,7 @@ export const PharmacyDispensing: React.FC = () => {
         alert("Patient not found or no prescriptions available.");
       } else {
         alert(
-          "Failed to load patient prescriptions. Please check the patient ID and try again."
+          "Failed to load patient prescriptions. Please check the patient and try again."
         );
       }
     } finally {
@@ -96,7 +116,8 @@ export const PharmacyDispensing: React.FC = () => {
       await loadInventory(); // Refresh inventory
       setShowDispensingModal(false);
       setPatientPrescriptions([]);
-      setPatientId("");
+      setSelectedPatient(null);
+      setPatientSearchTerm("");
       alert("Medication dispensed successfully!");
       return result;
     } catch (error: any) {
@@ -125,7 +146,8 @@ export const PharmacyDispensing: React.FC = () => {
       PHARMACY RECEIPT
       ========================
       Transaction ID: ${transaction._id || "TX-" + Date.now()}
-      Patient ID: ${transaction.patientId}
+      Patient: ${selectedPatient?.firstName} ${selectedPatient?.lastName}
+      Patient ID: ${selectedPatient?._id}
       Date: ${new Date().toLocaleString()}
       
       Medications:
@@ -170,7 +192,7 @@ export const PharmacyDispensing: React.FC = () => {
   const handleDrugInteractionCheck = async (medications: string[]) => {
     try {
       const result = await pharmacyService.checkDrugInteractions(
-        patientId,
+        selectedPatient?._id || "",
         medications
       );
       return result;
@@ -195,6 +217,20 @@ export const PharmacyDispensing: React.FC = () => {
 
     return matchesSearch;
   });
+
+  const filteredPatients = patients.filter(
+    (patient) =>
+      patient.firstName
+        .toLowerCase()
+        .includes(patientSearchTerm.toLowerCase()) ||
+      patient.lastName
+        .toLowerCase()
+        .includes(patientSearchTerm.toLowerCase()) ||
+      patient.nationalId
+        .toLowerCase()
+        .includes(patientSearchTerm.toLowerCase()) ||
+      patient._id?.toLowerCase().includes(patientSearchTerm.toLowerCase())
+  );
 
   const lowStockItems = inventory.filter(
     (item) => item.quantityOnHand <= item.reorderLevel
@@ -243,26 +279,70 @@ export const PharmacyDispensing: React.FC = () => {
                   <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                   <input
                     type="text"
-                    placeholder="Enter Patient ID (e.g., PAT001)..."
+                    placeholder="Search for patient by name, ID, or national ID..."
                     className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    value={patientId}
-                    onChange={(e) => setPatientId(e.target.value)}
-                    onKeyPress={(e) =>
-                      e.key === "Enter" && handleSearchPatient()
-                    }
+                    value={patientSearchTerm}
+                    onChange={(e) => {
+                      setPatientSearchTerm(e.target.value);
+                      setShowPatientSearch(true);
+                    }}
+                    onFocus={() => setShowPatientSearch(true)}
                   />
                 </div>
+
+                {/* Patient Search Results */}
+                {showPatientSearch && patientSearchTerm && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                    <div className="p-2 space-y-2">
+                      {filteredPatients.map((patient) => (
+                        <div
+                          key={patient._id}
+                          className={`flex items-center justify-between p-2 rounded cursor-pointer ${
+                            selectedPatient?._id === patient._id
+                              ? "bg-blue-50 border border-blue-200"
+                              : "hover:bg-gray-50"
+                          }`}
+                          onClick={() => {
+                            setSelectedPatient(patient);
+                            setPatientSearchTerm(
+                              `${patient.firstName} ${patient.lastName} (${patient.nationalId})`
+                            );
+                            setShowPatientSearch(false);
+                          }}
+                        >
+                          <div>
+                            <p className="font-medium">
+                              {patient.firstName} {patient.lastName}
+                            </p>
+                            <p className="text-sm text-gray-600">
+                              ID: {patient._id} | National ID:{" "}
+                              {patient.nationalId}
+                            </p>
+                          </div>
+                          <Button size="sm" variant="outline">
+                            Select
+                          </Button>
+                        </div>
+                      ))}
+                      {filteredPatients.length === 0 && (
+                        <p className="text-sm text-gray-500 text-center py-2">
+                          No patients found
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
               <Button
                 onClick={handleSearchPatient}
-                disabled={!patientId.trim() || loading}
+                disabled={!selectedPatient || loading}
               >
                 {loading ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : (
                   <User className="w-4 h-4 mr-2" />
                 )}
-                {loading ? "Searching..." : "Search Patient"}
+                {loading ? "Searching..." : "Get Prescriptions"}
               </Button>
               <div className="flex items-center space-x-2">
                 <Filter className="w-4 h-4 text-gray-500" />
@@ -276,6 +356,20 @@ export const PharmacyDispensing: React.FC = () => {
                 </select>
               </div>
             </div>
+
+            {/* Selected Patient Info */}
+            {selectedPatient && (
+              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                <h4 className="font-semibold text-blue-800">
+                  Selected Patient:
+                </h4>
+                <p className="text-blue-700">
+                  {selectedPatient.firstName} {selectedPatient.lastName}
+                  (ID: {selectedPatient._id}, National ID:{" "}
+                  {selectedPatient.nationalId})
+                </p>
+              </div>
+            )}
           </CardContent>
         </Card>
 
@@ -330,7 +424,8 @@ export const PharmacyDispensing: React.FC = () => {
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center">
                 <User className="w-5 h-5 mr-2" />
-                Active Prescriptions for Patient {patientId}
+                Active Prescriptions for {selectedPatient?.firstName}{" "}
+                {selectedPatient?.lastName}
               </div>
               <Button
                 size="sm"
@@ -517,10 +612,10 @@ export const PharmacyDispensing: React.FC = () => {
       </Card>
 
       {/* Dispensing Modal */}
-      {showDispensingModal && selectedPrescription && (
+      {showDispensingModal && selectedPrescription && selectedPatient && (
         <DispensingModal
           prescription={selectedPrescription}
-          patientId={patientId}
+          patient={selectedPatient}
           onDispense={handleDispense}
           onPrint={handlePrintReceipt}
           onInteractionCheck={handleDrugInteractionCheck}
@@ -546,14 +641,14 @@ export const PharmacyDispensing: React.FC = () => {
 // Dispensing Modal Component
 const DispensingModal: React.FC<{
   prescription: IMedicalRecord;
-  patientId: string;
+  patient: IUser;
   onDispense: (data: any) => Promise<any>;
   onPrint: (transaction: any) => void;
   onInteractionCheck: (medications: string[]) => Promise<string[]>;
   onClose: () => void;
 }> = ({
   prescription,
-  patientId,
+  patient,
   onDispense,
   onPrint,
   onInteractionCheck,
@@ -591,7 +686,7 @@ const DispensingModal: React.FC<{
 
       const dispenseData = {
         prescriptionId: prescription._id!,
-        patientId: patientId,
+        patientId: patient._id!,
         pharmacistId: "PHA001", // This should come from auth context in real app
         medications: prescription.prescription.medications.map((med) => ({
           medicationId: med.medicationId,
@@ -621,7 +716,7 @@ const DispensingModal: React.FC<{
       // Create mock transaction for printing
       const mockTransaction = {
         _id: "TX-" + Date.now(),
-        patientId: patientId,
+        patientId: patient._id,
         medications:
           prescription.prescription?.medications.map((med) => ({
             name: med.name,
@@ -690,8 +785,14 @@ const DispensingModal: React.FC<{
                 </h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
+                    <span>Patient:</span>
+                    <span className="font-medium">
+                      {patient.firstName} {patient.lastName}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
                     <span>Patient ID:</span>
-                    <span className="font-medium">{patientId}</span>
+                    <span className="font-medium">{patient._id}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Prescription:</span>
@@ -856,12 +957,14 @@ const DispensingModal: React.FC<{
                 <h4 className="font-semibold mb-2">Transaction Details</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span>Prescription:</span>
-                    <span>{prescription.title}</span>
+                    <span>Patient:</span>
+                    <span>
+                      {patient.firstName} {patient.lastName}
+                    </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Patient ID:</span>
-                    <span>{patientId}</span>
+                    <span>Prescription:</span>
+                    <span>{prescription.title}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Dispensed At:</span>

@@ -34,6 +34,7 @@ export const WardManagement: React.FC = () => {
   const [patients, setPatients] = useState<IUser[]>([]);
   const [patientSearchTerm, setPatientSearchTerm] = useState("");
   const [selectedPatient, setSelectedPatient] = useState<IUser | null>(null);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const { user } = useAuth();
   const wardService = new WardService();
@@ -98,6 +99,7 @@ export const WardManagement: React.FC = () => {
 
   const handleAllocateBed = async (bedId: string, patientId: string) => {
     try {
+      setActionLoading("allocate");
       await wardService.allocateBed(bedId, patientId);
       await loadAllBeds();
       await loadWards();
@@ -108,6 +110,8 @@ export const WardManagement: React.FC = () => {
     } catch (error: any) {
       console.error("Failed to allocate bed:", error);
       alert(`Failed to allocate bed: ${error.message}`);
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -116,6 +120,7 @@ export const WardManagement: React.FC = () => {
     newBedId: string
   ) => {
     try {
+      setActionLoading("transfer");
       await wardService.transferPatient(currentBedId, newBedId);
       await loadAllBeds();
       await loadWards();
@@ -124,11 +129,14 @@ export const WardManagement: React.FC = () => {
     } catch (error: any) {
       console.error("Failed to transfer patient:", error);
       alert(`Failed to transfer patient: ${error.message}`);
+    } finally {
+      setActionLoading(null);
     }
   };
 
   const handleDischargePatient = async (bedId: string) => {
     try {
+      setActionLoading(`discharge-${bedId}`);
       await wardService.dischargePatient(bedId);
       await loadAllBeds();
       await loadWards();
@@ -136,6 +144,8 @@ export const WardManagement: React.FC = () => {
     } catch (error: any) {
       console.error("Failed to discharge patient:", error);
       alert(`Failed to discharge patient: ${error.message}`);
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -175,7 +185,10 @@ export const WardManagement: React.FC = () => {
       patient.lastName
         .toLowerCase()
         .includes(patientSearchTerm.toLowerCase()) ||
-      patient.nationalId.toLowerCase().includes(patientSearchTerm.toLowerCase())
+      patient.nationalId
+        .toLowerCase()
+        .includes(patientSearchTerm.toLowerCase()) ||
+      patient._id?.toLowerCase().includes(patientSearchTerm.toLowerCase())
   );
 
   const availableBedsForTransfer = allBeds.filter(
@@ -485,8 +498,13 @@ export const WardManagement: React.FC = () => {
                                 setSelectedBed(bed);
                                 setShowTransferModal(true);
                               }}
+                              disabled={actionLoading === "transfer"}
                             >
-                              Transfer
+                              {actionLoading === "transfer" ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                "Transfer"
+                              )}
                             </Button>
                             <Button
                               size="sm"
@@ -498,8 +516,15 @@ export const WardManagement: React.FC = () => {
                                   handleDischargePatient(bed._id!);
                                 }
                               }}
+                              disabled={
+                                actionLoading === `discharge-${bed._id}`
+                              }
                             >
-                              Discharge
+                              {actionLoading === `discharge-${bed._id}` ? (
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                              ) : (
+                                "Discharge"
+                              )}
                             </Button>
                           </div>
                         </div>
@@ -529,6 +554,7 @@ export const WardManagement: React.FC = () => {
             setSelectedPatient(null);
             setPatientSearchTerm("");
           }}
+          loading={actionLoading === "allocate"}
         />
       )}
 
@@ -542,6 +568,7 @@ export const WardManagement: React.FC = () => {
             setShowTransferModal(false);
             setSelectedBed(null);
           }}
+          loading={actionLoading === "transfer"}
         />
       )}
     </>
@@ -580,6 +607,7 @@ const BedAllocationModal: React.FC<{
   selectedPatient: IUser | null;
   onAllocate: (bedId: string, patientId: string) => void;
   onClose: () => void;
+  loading: boolean;
 }> = ({
   bed,
   patients,
@@ -589,6 +617,7 @@ const BedAllocationModal: React.FC<{
   selectedPatient,
   onAllocate,
   onClose,
+  loading,
 }) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -617,7 +646,7 @@ const BedAllocationModal: React.FC<{
               value={patientSearchTerm}
               onChange={(e) => onPatientSearchChange(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter patient name or ID..."
+              placeholder="Enter patient name, ID, or national ID..."
             />
           </div>
 
@@ -640,7 +669,7 @@ const BedAllocationModal: React.FC<{
                         {patient.firstName} {patient.lastName}
                       </p>
                       <p className="text-sm text-gray-600">
-                        ID: {patient.nationalId} | {patient.phone}
+                        ID: {patient._id} | National ID: {patient.nationalId}
                       </p>
                     </div>
                     <Button size="sm" variant="outline">
@@ -664,7 +693,7 @@ const BedAllocationModal: React.FC<{
               </h4>
               <p className="text-green-700">
                 {selectedPatient.firstName} {selectedPatient.lastName}
-                (ID: {selectedPatient.nationalId})
+                (ID: {selectedPatient._id})
               </p>
             </div>
           )}
@@ -695,8 +724,15 @@ const BedAllocationModal: React.FC<{
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!selectedPatient}>
-              Allocate Bed
+            <Button type="submit" disabled={!selectedPatient || loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Allocating...
+                </>
+              ) : (
+                "Allocate Bed"
+              )}
             </Button>
           </div>
         </form>
@@ -711,7 +747,8 @@ const TransferPatientModal: React.FC<{
   availableBeds: IBed[];
   onTransfer: (currentBedId: string, newBedId: string) => void;
   onClose: () => void;
-}> = ({ currentBed, availableBeds, onTransfer, onClose }) => {
+  loading: boolean;
+}> = ({ currentBed, availableBeds, onTransfer, onClose, loading }) => {
   const [selectedNewBed, setSelectedNewBed] = useState<IBed | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -737,6 +774,11 @@ const TransferPatientModal: React.FC<{
             <p className="text-yellow-700">
               Bed {currentBed.bedNumber} ({currentBed.bedType} Ward)
             </p>
+            {currentBed.patientId && (
+              <p className="text-sm text-yellow-600 mt-1">
+                Patient: {currentBed.patientId}
+              </p>
+            )}
           </div>
 
           <div>
@@ -790,8 +832,15 @@ const TransferPatientModal: React.FC<{
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!selectedNewBed}>
-              Transfer Patient
+            <Button type="submit" disabled={!selectedNewBed || loading}>
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Transferring...
+                </>
+              ) : (
+                "Transfer Patient"
+              )}
             </Button>
           </div>
         </form>

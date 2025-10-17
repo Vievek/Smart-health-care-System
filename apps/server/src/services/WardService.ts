@@ -78,7 +78,7 @@ export class WardService implements IService<IWard> {
 
     const patientId = currentBed.patientId;
 
-    // Free current bed
+    // Free current bed - use undefined instead of null
     await this.bedRepo.update(currentBedId, {
       patientId: undefined,
       status: BedStatus.AVAILABLE,
@@ -107,8 +107,12 @@ export class WardService implements IService<IWard> {
       throw new Error("Bed not found");
     }
 
+    if (!bed.patientId) {
+      throw new Error("No patient assigned to this bed");
+    }
+
     const updatedBed = await this.bedRepo.update(bedId, {
-      patientId: undefined,
+      patientId: undefined, // Use undefined instead of null
       status: BedStatus.AVAILABLE,
     } as Partial<IBed>);
 
