@@ -41,6 +41,12 @@ export class WardService implements IService<IWard> {
       throw new Error("Bed not available");
     }
 
+    // Check if patient already has a bed
+    const existingBed = await this.bedRepo.findByPatientId(patientId);
+    if (existingBed) {
+      throw new Error("Patient already has a bed assigned");
+    }
+
     const updatedBed = await this.bedRepo.update(bedId, {
       patientId,
       status: BedStatus.OCCUPIED,

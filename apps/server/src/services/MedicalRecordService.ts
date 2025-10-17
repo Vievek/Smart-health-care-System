@@ -73,6 +73,7 @@ export class MedicalRecordService implements IService<IMedicalRecord> {
   ): Promise<IMedicalRecord[]> {
     console.log(`Getting prescriptions for patient: ${patientId}`);
     try {
+      // FIXED: Use the correct repository method
       const prescriptions =
         await this.medicalRecordRepo.findPrescriptionsByPatient(patientId);
       console.log(

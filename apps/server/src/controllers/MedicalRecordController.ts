@@ -169,7 +169,7 @@ export class MedicalRecordController {
     }
   };
 
-  // Fixed method to get prescriptions by patient ID
+  // FIXED: Proper patient prescription retrieval
   getPrescriptionsByPatient = async (
     req: AuthRequest,
     res: Response
@@ -187,13 +187,13 @@ export class MedicalRecordController {
         user.role
       );
 
-      // Check authorization - pharmacists should be able to access
+      // Check authorization
       if (user.role === "patient" && user._id !== patientId) {
         res.status(403).json({ error: "Access denied" });
         return;
       }
 
-      // Use the dedicated prescription method
+      // Use the correct method to get prescriptions
       const prescriptions =
         await this.medicalRecordService.getPrescriptionsByPatient(patientId);
 

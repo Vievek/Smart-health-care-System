@@ -64,7 +64,7 @@ export const PharmacyDispensing: React.FC = () => {
 
     try {
       setLoading(true);
-      // Use the new prescription-specific endpoint
+      // FIXED: Use the correct method to get prescriptions
       const prescriptions =
         await medicalRecordService.getPrescriptionsByPatient(patientId);
       setPatientPrescriptions(prescriptions);
