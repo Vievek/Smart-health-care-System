@@ -41,6 +41,7 @@ export const MedicalRecordsDashboard: React.FC<
   const loadRecords = async () => {
     try {
       const data = await medicalRecordService.getRecords();
+       console.log("Loaded medical records:", data);
       setRecords(data);
     } catch (error) {
       console.error("Failed to load records:", error);
@@ -125,7 +126,6 @@ export const MedicalRecordsDashboard: React.FC<
           <Card
             key={record._id}
             className="cursor-pointer hover:shadow-lg transition-shadow"
-            onClick={() => setSelectedRecord(record)}
           >
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">

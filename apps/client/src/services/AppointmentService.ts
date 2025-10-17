@@ -17,11 +17,33 @@ export class AppointmentService implements IAppointmentService {
   }
 
   async getAppointments(): Promise<IAppointment[]> {
-    return this.apiService.get<IAppointment[]>("/appointments");
+    try {
+      const appointments = await this.apiService.get<IAppointment[]>(
+        "/appointments"
+      );
+      console.log(
+        "AppointmentService: Loaded appointments:",
+        appointments.length
+      );
+      return appointments;
+    } catch (error) {
+      console.error("AppointmentService: Failed to load appointments:", error);
+      throw error;
+    }
   }
 
   async createAppointment(data: any): Promise<IAppointment> {
-    return this.apiService.post<IAppointment>("/appointments", data);
+    try {
+      const appointment = await this.apiService.post<IAppointment>(
+        "/appointments",
+        data
+      );
+      console.log("AppointmentService: Appointment created successfully");
+      return appointment;
+    } catch (error) {
+      console.error("AppointmentService: Failed to create appointment:", error);
+      throw error;
+    }
   }
 
   async cancelAppointment(id: string): Promise<IAppointment> {

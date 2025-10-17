@@ -17,8 +17,18 @@ export class MedicalRecordService implements IMedicalRecordService {
   }
 
   async getRecords(patientId?: string): Promise<IMedicalRecord[]> {
-    const params = patientId ? { patientId } : undefined;
-    return this.apiService.get<IMedicalRecord[]>("/medical-records", params);
+    try {
+      const params = patientId ? { patientId } : undefined;
+      const records = await this.apiService.get<IMedicalRecord[]>(
+        "/medical-records",
+        params
+      );
+      console.log("MedicalRecordService: Loaded records:", records.length);
+      return records;
+    } catch (error) {
+      console.error("MedicalRecordService: Failed to load records:", error);
+      throw error;
+    }
   }
 
   async getRecordById(id: string): Promise<IMedicalRecord> {
@@ -26,21 +36,25 @@ export class MedicalRecordService implements IMedicalRecordService {
   }
 
   async downloadRecordPDF(id: string): Promise<Blob> {
-    // For blob responses, we need to handle differently
-    const response = await fetch(
-      `http://localhost:5000/api/medical-records/${id}/download`,
-      {
-        headers: {
-          Authorization: `Bearer ${localStorage.getItem("authToken")}`,
-        },
+    try {
+      const response = await fetch(
+        `http://localhost:5000/api/medical-records/${id}/download`,
+        {
+          headers: {
+            Authorization: `Bearer ${localStorage.getItem("authToken")}`,
+          },
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Failed to download PDF: ${response.statusText}`);
       }
-    );
 
-    if (!response.ok) {
-      throw new Error("Failed to download PDF");
+      return response.blob();
+    } catch (error) {
+      console.error("MedicalRecordService: PDF download failed:", error);
+      throw error;
     }
-
-    return response.blob();
   }
 
   async createPrescription(data: any): Promise<IMedicalRecord> {

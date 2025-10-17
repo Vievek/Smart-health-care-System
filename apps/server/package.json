@@ -5,9 +5,10 @@
     "dev": "nodemon --exec \"node --loader ts-node/esm\" src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
-    "build:dev": "npm run build && npm start",
+    "build:dev": "npm run build && npm run seed",
     "lint": "eslint src --ext .ts",
-    "lint:fix": "eslint src --ext .ts --fix"
+    "lint:fix": "eslint src --ext .ts --fix",
+    "seed": "node dist/scripts/seedData.js"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

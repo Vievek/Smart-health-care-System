@@ -2,7 +2,7 @@ import { Router } from "express";
 import { UserService } from "../services/UserService.js";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcryptjs";
-import { UserRole, IPatient, IDoctor } from "@shared/healthcare-types";
+import { UserRole } from "@shared/healthcare-types";
 
 const router = Router();
 

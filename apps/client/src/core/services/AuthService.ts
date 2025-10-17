@@ -3,7 +3,7 @@ import {
   LoginCredentials,
   AuthResponse,
 } from "../interfaces/IApiService";
-import { IUser, UserRole } from "@shared/healthcare-types"; // Changed from User to IUser
+import { IUser, UserRole } from "@shared/healthcare-types";
 import { IApiService } from "../interfaces/IApiService";
 import { ApiService } from "./ApiService";
 
@@ -15,17 +15,26 @@ export class AuthService implements IAuthService {
   }
 
   async login(credentials: LoginCredentials): Promise<AuthResponse> {
-    const response = await this.apiService.post<AuthResponse>(
-      "/auth/login",
-      credentials
-    );
+    try {
+      console.log("AuthService: Attempting login with", credentials.nationalId);
+      const response = await this.apiService.post<AuthResponse>(
+        "/auth/login",
+        credentials
+      );
 
-    if (response.token) {
-      localStorage.setItem("authToken", response.token);
-      localStorage.setItem("user", JSON.stringify(response.user));
+      if (response.token && response.user) {
+        localStorage.setItem("authToken", response.token);
+        localStorage.setItem("user", JSON.stringify(response.user));
+        console.log("AuthService: Login successful, user:", response.user);
+      } else {
+        throw new Error("Invalid response from server");
+      }
+
+      return response;
+    } catch (error: any) {
+      console.error("AuthService: Login failed:", error);
+      throw error;
     }
-
-    return response;
   }
 
   logout(): void {
@@ -34,13 +43,26 @@ export class AuthService implements IAuthService {
   }
 
   getCurrentUser(): IUser | null {
-    // Changed from User to IUser
-    const userStr = localStorage.getItem("user");
-    return userStr ? JSON.parse(userStr) : null;
+    try {
+      const userStr = localStorage.getItem("user");
+      if (!userStr) return null;
+
+      const user = JSON.parse(userStr);
+      // Validate required fields
+      if (user && user._id && user.role) {
+        return user;
+      }
+      return null;
+    } catch (error) {
+      console.error("Error parsing user data:", error);
+      return null;
+    }
   }
 
   isAuthenticated(): boolean {
-    return !!localStorage.getItem("authToken");
+    const token = localStorage.getItem("authToken");
+    const user = this.getCurrentUser();
+    return !!(token && user);
   }
 
   hasRole(role: UserRole): boolean {

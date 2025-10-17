@@ -11,6 +11,7 @@ import { medicalRecordRoutes } from "./routes/medicalRecords.js";
 import { appointmentRoutes } from "./routes/appointments.js";
 import { wardRoutes } from "./routes/wards.js";
 import { pharmacyRoutes } from "./routes/pharmacy.js";
+import { userRoutes } from "./routes/users.js";
 
 console.log("🔧 Starting server initialization...");
 
@@ -43,6 +44,7 @@ app.use("/api/medical-records", medicalRecordRoutes);
 app.use("/api/appointments", appointmentRoutes);
 app.use("/api/wards", wardRoutes);
 app.use("/api/pharmacy", pharmacyRoutes);
+app.use("/api/users", userRoutes);
 console.log("✅ Routes imported and mounted");
 
 // Health check
