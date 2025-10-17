@@ -19,6 +19,7 @@ import {
   Search,
   Eye,
   Filter,
+  X,
 } from "lucide-react";
 
 interface MedicalRecordsDashboardProps {
@@ -170,6 +171,33 @@ export const MedicalRecordsDashboard: React.FC<
       (record.description &&
         record.description.toLowerCase().includes(searchTerm.toLowerCase()))
   );
+
+  // FIXED: Close modal when clicking outside or escape key
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape") {
+        setSelectedRecord(null);
+      }
+    };
+
+    if (selectedRecord) {
+      document.addEventListener("keydown", handleEscape);
+      document.body.style.overflow = "hidden"; // Prevent background scrolling
+    } else {
+      document.body.style.overflow = "unset";
+    }
+
+    return () => {
+      document.removeEventListener("keydown", handleEscape);
+      document.body.style.overflow = "unset";
+    };
+  }, [selectedRecord]);
+
+  const handleModalClose = (e: React.MouseEvent) => {
+    if (e.target === e.currentTarget) {
+      setSelectedRecord(null);
+    }
+  };
 
   if (loading) {
     return (
@@ -420,13 +448,184 @@ export const MedicalRecordsDashboard: React.FC<
         </CardContent>
       </Card>
 
-      {/* Record Detail Modal */}
+      {/* FIXED: Record Detail Modal - Completely restructured */}
       {selectedRecord && (
-        <RecordDetailModal
-          record={selectedRecord}
-          onClose={() => setSelectedRecord(null)}
-          onDownload={handleDownloadPDF}
-        />
+        <div
+          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50"
+          onClick={handleModalClose}
+        >
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6 border-b flex justify-between items-center">
+              <h2 className="text-2xl font-bold">{selectedRecord.title}</h2>
+              <button
+                onClick={() => setSelectedRecord(null)}
+                className="text-gray-500 hover:text-gray-700 text-2xl p-1"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="p-6 space-y-6">
+              {/* Record Details */}
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="font-semibold block">Record Type:</label>
+                  <p className="capitalize">{selectedRecord.recordType}</p>
+                </div>
+                <div>
+                  <label className="font-semibold block">Created Date:</label>
+                  <p>
+                    {new Date(selectedRecord.createdDate).toLocaleDateString()}
+                  </p>
+                </div>
+                <div>
+                  <label className="font-semibold block">Patient ID:</label>
+                  <p>{selectedRecord.patientId}</p>
+                </div>
+                <div>
+                  <label className="font-semibold block">Author ID:</label>
+                  <p>{selectedRecord.authorId}</p>
+                </div>
+              </div>
+
+              {/* Description */}
+              {selectedRecord.description && (
+                <div>
+                  <label className="font-semibold block">Description:</label>
+                  <p className="mt-1">{selectedRecord.description}</p>
+                </div>
+              )}
+
+              {/* Prescription Details */}
+              {selectedRecord.prescription && (
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-3 text-lg">
+                    Prescription Details
+                  </h3>
+                  <div className="space-y-3">
+                    {selectedRecord.prescription.medications.map(
+                      (med, index) => (
+                        <div
+                          key={index}
+                          className="flex justify-between items-center p-3 bg-gray-50 rounded"
+                        >
+                          <div>
+                            <span className="font-medium">{med.name}</span>
+                            <span className="text-sm text-gray-600 ml-2">
+                              {med.dosage} • {med.frequency}
+                            </span>
+                          </div>
+                          <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                            {med.duration}
+                          </span>
+                        </div>
+                      )
+                    )}
+                  </div>
+                  {selectedRecord.prescription.instructions && (
+                    <div className="mt-3 p-3 bg-yellow-50 rounded">
+                      <label className="font-semibold block text-yellow-800">
+                        Instructions:
+                      </label>
+                      <p className="text-sm text-yellow-700">
+                        {selectedRecord.prescription.instructions}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Lab Results */}
+              {selectedRecord.labResults && (
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-3 text-lg">
+                    Lab Results: {selectedRecord.labResults.testName}
+                  </h3>
+                  <div className="space-y-2">
+                    {Object.entries(selectedRecord.labResults.results).map(
+                      ([key, value]) => (
+                        <div
+                          key={key}
+                          className="flex justify-between items-center py-2 border-b"
+                        >
+                          <span className="font-medium capitalize">{key}:</span>
+                          <div className="text-right">
+                            <span className="font-medium">
+                              {value} {selectedRecord.labResults?.units[key]}
+                            </span>
+                            <div className="text-xs text-gray-500">
+                              Normal:{" "}
+                              {selectedRecord.labResults?.normalRange[key]}
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Visit Details */}
+              {selectedRecord.visitDetails && (
+                <div className="border rounded-lg p-4">
+                  <h3 className="font-semibold mb-3 text-lg">Visit Details</h3>
+                  <div className="space-y-3">
+                    {selectedRecord.visitDetails.diagnosis && (
+                      <div>
+                        <label className="font-semibold block">
+                          Diagnosis:
+                        </label>
+                        <p>{selectedRecord.visitDetails.diagnosis}</p>
+                      </div>
+                    )}
+                    {selectedRecord.visitDetails.symptoms &&
+                      selectedRecord.visitDetails.symptoms.length > 0 && (
+                        <div>
+                          <label className="font-semibold block">
+                            Symptoms:
+                          </label>
+                          <div className="flex flex-wrap gap-1 mt-1">
+                            {selectedRecord.visitDetails.symptoms.map(
+                              (symptom, index) => (
+                                <span
+                                  key={index}
+                                  className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-sm"
+                                >
+                                  {symptom}
+                                </span>
+                              )
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    {selectedRecord.visitDetails.notes && (
+                      <div>
+                        <label className="font-semibold block">Notes:</label>
+                        <p className="mt-1">
+                          {selectedRecord.visitDetails.notes}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Action Buttons */}
+              <div className="flex justify-end space-x-3 pt-4 border-t">
+                <Button
+                  variant="outline"
+                  onClick={() => setSelectedRecord(null)}
+                >
+                  Close
+                </Button>
+                <Button onClick={() => handleDownloadPDF(selectedRecord._id!)}>
+                  <Download className="w-4 h-4 mr-2" />
+                  Download PDF
+                </Button>
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -443,173 +642,4 @@ const getRecordIcon = (recordType: string) => {
     default:
       return <FileText className="w-5 h-5 mr-2 inline" />;
   }
-};
-
-// Record Detail Modal Component
-const RecordDetailModal: React.FC<{
-  record: IMedicalRecord;
-  onClose: () => void;
-  onDownload: (id: string) => void;
-}> = ({ record, onClose, onDownload }) => {
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-      <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b">
-          <div className="flex justify-between items-center">
-            <h2 className="text-2xl font-bold">{record.title}</h2>
-            <button
-              onClick={onClose}
-              className="text-gray-500 hover:text-gray-700 text-2xl"
-            >
-              ×
-            </button>
-          </div>
-        </div>
-
-        <div className="p-6 space-y-6">
-          {/* Record Details */}
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="font-semibold block">Record Type:</label>
-              <p className="capitalize">{record.recordType}</p>
-            </div>
-            <div>
-              <label className="font-semibold block">Created Date:</label>
-              <p>{new Date(record.createdDate).toLocaleDateString()}</p>
-            </div>
-            <div>
-              <label className="font-semibold block">Patient ID:</label>
-              <p>{record.patientId}</p>
-            </div>
-            <div>
-              <label className="font-semibold block">Author ID:</label>
-              <p>{record.authorId}</p>
-            </div>
-          </div>
-
-          {/* Description */}
-          {record.description && (
-            <div>
-              <label className="font-semibold block">Description:</label>
-              <p className="mt-1">{record.description}</p>
-            </div>
-          )}
-
-          {/* Prescription Details */}
-          {record.prescription && (
-            <div className="border rounded-lg p-4">
-              <h3 className="font-semibold mb-3 text-lg">
-                Prescription Details
-              </h3>
-              <div className="space-y-3">
-                {record.prescription.medications.map((med, index) => (
-                  <div
-                    key={index}
-                    className="flex justify-between items-center p-3 bg-gray-50 rounded"
-                  >
-                    <div>
-                      <span className="font-medium">{med.name}</span>
-                      <span className="text-sm text-gray-600 ml-2">
-                        {med.dosage} • {med.frequency}
-                      </span>
-                    </div>
-                    <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
-                      {med.duration}
-                    </span>
-                  </div>
-                ))}
-              </div>
-              {record.prescription.instructions && (
-                <div className="mt-3 p-3 bg-yellow-50 rounded">
-                  <label className="font-semibold block text-yellow-800">
-                    Instructions:
-                  </label>
-                  <p className="text-sm text-yellow-700">
-                    {record.prescription.instructions}
-                  </p>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Lab Results */}
-          {record.labResults && (
-            <div className="border rounded-lg p-4">
-              <h3 className="font-semibold mb-3 text-lg">
-                Lab Results: {record.labResults.testName}
-              </h3>
-              <div className="space-y-2">
-                {Object.entries(record.labResults.results).map(
-                  ([key, value]) => (
-                    <div
-                      key={key}
-                      className="flex justify-between items-center py-2 border-b"
-                    >
-                      <span className="font-medium capitalize">{key}:</span>
-                      <div className="text-right">
-                        <span className="font-medium">
-                          {value} {record.labResults?.units[key]}
-                        </span>
-                        <div className="text-xs text-gray-500">
-                          Normal: {record.labResults?.normalRange[key]}
-                        </div>
-                      </div>
-                    </div>
-                  )
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Visit Details */}
-          {record.visitDetails && (
-            <div className="border rounded-lg p-4">
-              <h3 className="font-semibold mb-3 text-lg">Visit Details</h3>
-              <div className="space-y-3">
-                {record.visitDetails.diagnosis && (
-                  <div>
-                    <label className="font-semibold block">Diagnosis:</label>
-                    <p>{record.visitDetails.diagnosis}</p>
-                  </div>
-                )}
-                {record.visitDetails.symptoms &&
-                  record.visitDetails.symptoms.length > 0 && (
-                    <div>
-                      <label className="font-semibold block">Symptoms:</label>
-                      <div className="flex flex-wrap gap-1 mt-1">
-                        {record.visitDetails.symptoms.map((symptom, index) => (
-                          <span
-                            key={index}
-                            className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-sm"
-                          >
-                            {symptom}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-                {record.visitDetails.notes && (
-                  <div>
-                    <label className="font-semibold block">Notes:</label>
-                    <p className="mt-1">{record.visitDetails.notes}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Action Buttons */}
-          <div className="flex justify-end space-x-3 pt-4 border-t">
-            <Button variant="outline" onClick={onClose}>
-              Close
-            </Button>
-            <Button onClick={() => onDownload(record._id!)}>
-              <Download className="w-4 h-4 mr-2" />
-              Download PDF
-            </Button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
 };
