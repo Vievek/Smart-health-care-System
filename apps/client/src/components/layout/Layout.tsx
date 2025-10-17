@@ -12,17 +12,60 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const navigation = [
-    { name: "Medical Records", href: "/medical-records", icon: FileText },
-    { name: "Appointments", href: "/appointments", icon: Calendar },
-    { name: "Ward Management", href: "/wards", icon: Bed },
-    { name: "Pharmacy", href: "/pharmacy", icon: Pill },
-  ];
+  // Define navigation based on user role
+  const getNavigation = () => {
+    const baseNav = [
+      {
+        name: "Medical Records",
+        href: "/medical-records",
+        icon: FileText,
+        roles: ["patient", "doctor", "admin"],
+      },
+      {
+        name: "Appointments",
+        href: "/appointments",
+        icon: Calendar,
+        roles: ["patient", "doctor"],
+      },
+      {
+        name: "Ward Management",
+        href: "/wards",
+        icon: Bed,
+        roles: ["nurse", "ward_clerk", "admin"],
+      },
+      {
+        name: "Pharmacy",
+        href: "/pharmacy",
+        icon: Pill,
+        roles: ["pharmacist", "admin"],
+      },
+    ];
+
+    return baseNav.filter(
+      (item) => item.roles.includes(user?.role || "") || user?.role === "admin"
+    );
+  };
+
+  const navigation = getNavigation();
 
   const handleLogout = () => {
     logout();
     navigate("/login");
   };
+
+  // Redirect unauthorized users
+  React.useEffect(() => {
+    const currentPath = location.pathname;
+
+    if (user) {
+      // Check if current path is accessible by user role
+      const navItem = navigation.find((item) => item.href === currentPath);
+      if (!navItem && currentPath !== "/medical-records") {
+        // Redirect to medical records if trying to access unauthorized section
+        navigate("/medical-records");
+      }
+    }
+  }, [user, location, navigate, navigation]);
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -34,7 +77,9 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
             <h1 className="text-xl font-bold text-gray-800">
               Healthcare System
             </h1>
-            <p className="text-sm text-gray-600 mt-1">{user?.role} Portal</p>
+            <p className="text-sm text-gray-600 mt-1 capitalize">
+              {user?.role} Portal
+            </p>
           </div>
 
           {/* Navigation */}
@@ -92,3 +137,4 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     </div>
   );
 };
+

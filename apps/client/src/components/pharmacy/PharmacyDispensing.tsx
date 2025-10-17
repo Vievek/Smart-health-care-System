@@ -8,7 +8,12 @@ import {
 } from "../ui/card";
 import { Button } from "../ui/button";
 import { PharmacyService } from "../../services/PharmacyService";
-import { IInventoryItem } from "@shared/healthcare-types";
+import { MedicalRecordService } from "../../services/MedicalRecordService";
+import {
+  IInventoryItem,
+  IMedicalRecord,
+  MedicalRecordType,
+} from "@shared/healthcare-types";
 import {
   Pill,
   Search,
@@ -16,16 +21,24 @@ import {
   ShoppingCart,
   AlertTriangle,
   CheckCircle,
-  FileText,
+  Printer,
+  User,
+  Loader2,
 } from "lucide-react";
 
 export const PharmacyDispensing: React.FC = () => {
   const [inventory, setInventory] = useState<IInventoryItem[]>([]);
-  const [searchTerm, setSearchTerm] = useState("");
   const [showDispensingModal, setShowDispensingModal] = useState(false);
-  const [selectedPrescription, setSelectedPrescription] = useState<any>(null);
+  const [selectedPrescription, setSelectedPrescription] =
+    useState<IMedicalRecord | null>(null);
+  const [patientId, setPatientId] = useState("");
+  const [patientPrescriptions, setPatientPrescriptions] = useState<
+    IMedicalRecord[]
+  >([]);
+  const [loading, setLoading] = useState(false);
 
   const pharmacyService = new PharmacyService();
+  const medicalRecordService = new MedicalRecordService();
 
   useEffect(() => {
     loadInventory();
@@ -40,13 +53,105 @@ export const PharmacyDispensing: React.FC = () => {
     }
   };
 
+  const handleSearchPatient = async () => {
+    if (!patientId.trim()) return;
+
+    try {
+      setLoading(true);
+      // Get prescriptions for the patient using the medical record service
+      const prescriptions = await medicalRecordService.getRecords(patientId);
+
+      // Filter only active prescriptions
+      const activePrescriptions = prescriptions.filter(
+        (record) =>
+          record.recordType === MedicalRecordType.PRESCRIPTION &&
+          record.prescription?.status === "active"
+      );
+
+      setPatientPrescriptions(activePrescriptions);
+    } catch (error) {
+      console.error("Failed to search patient:", error);
+      alert(
+        "Failed to load patient prescriptions. Please check the patient ID."
+      );
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleDispense = async (dispenseData: any) => {
     try {
-      await pharmacyService.dispenseMedication(dispenseData);
-      await loadInventory();
+      const result = await pharmacyService.dispenseMedication(dispenseData);
+      await loadInventory(); // Refresh inventory
       setShowDispensingModal(false);
-    } catch (error) {
+      setPatientPrescriptions([]);
+      setPatientId("");
+      alert("Medication dispensed successfully!");
+      return result;
+    } catch (error: any) {
       console.error("Failed to dispense medication:", error);
+      alert(`Dispensing failed: ${error.message}`);
+      throw error;
+    }
+  };
+
+  const handlePrintReceipt = (transaction: any) => {
+    const receiptContent = `
+      PHARMACY RECEIPT
+      ========================
+      Transaction ID: ${transaction._id || "TX-" + Date.now()}
+      Patient ID: ${transaction.patientId}
+      Date: ${new Date().toLocaleString()}
+      
+      Medications:
+      ${transaction.medications
+        ?.map((med: any) => `- ${med.name}: ${med.quantity} x $${med.price}`)
+        .join("\n")}
+      
+      Total Amount: $${transaction.amount || "0.00"}
+      Status: ${transaction.paymentStatus}
+      ========================
+      Thank you for your business!
+    `;
+
+    const printWindow = window.open("", "_blank");
+    if (printWindow) {
+      printWindow.document.write(`
+        <html>
+          <head>
+            <title>Pharmacy Receipt</title>
+            <style>
+              body { font-family: monospace; margin: 20px; }
+              .receipt { border: 1px solid #000; padding: 20px; }
+            </style>
+          </head>
+          <body>
+            <div class="receipt">
+              <pre>${receiptContent}</pre>
+            </div>
+            <script>
+              window.onload = function() {
+                window.print();
+                setTimeout(() => window.close(), 1000);
+              }
+            </script>
+          </body>
+        </html>
+      `);
+      printWindow.document.close();
+    }
+  };
+
+  const handleDrugInteractionCheck = async (medications: string[]) => {
+    try {
+      const result = await pharmacyService.checkDrugInteractions(
+        patientId,
+        medications
+      );
+      return result;
+    } catch (error) {
+      console.error("Drug interaction check failed:", error);
+      return ["Error checking interactions"];
     }
   };
 
@@ -56,7 +161,7 @@ export const PharmacyDispensing: React.FC = () => {
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      {/* Header - From Storyboard */}
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">
@@ -83,21 +188,37 @@ export const PharmacyDispensing: React.FC = () => {
         </div>
       </div>
 
-      {/* Search and Patient Selection - From Storyboard Panel 1-3 */}
+      {/* Search and Patient Selection */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <Card className="lg:col-span-2">
           <CardContent className="p-4">
             <div className="flex items-center space-x-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <input
-                  type="text"
-                  placeholder="Scan digital health card or search patient by ID..."
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
+              <div className="flex-1">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                  <input
+                    type="text"
+                    placeholder="Enter Patient ID (e.g., PAT001)..."
+                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    value={patientId}
+                    onChange={(e) => setPatientId(e.target.value)}
+                    onKeyPress={(e) =>
+                      e.key === "Enter" && handleSearchPatient()
+                    }
+                  />
+                </div>
               </div>
+              <Button
+                onClick={handleSearchPatient}
+                disabled={!patientId.trim() || loading}
+              >
+                {loading ? (
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                ) : (
+                  <User className="w-4 h-4 mr-2" />
+                )}
+                {loading ? "Searching..." : "Search Patient"}
+              </Button>
               <Button variant="outline">
                 <Filter className="w-4 h-4 mr-2" />
                 Filter
@@ -123,15 +244,23 @@ export const PharmacyDispensing: React.FC = () => {
         </Card>
       </div>
 
-      {/* Patient Prescriptions - From Storyboard Panel 3-4 */}
-      {searchTerm && (
+      {/* Patient Prescriptions */}
+      {patientPrescriptions.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center justify-between">
               <div className="flex items-center">
-                Active Prescriptions for Patient
+                Active Prescriptions for Patient {patientId}
               </div>
-              <Button size="sm" onClick={() => setShowDispensingModal(true)}>
+              <Button
+                size="sm"
+                onClick={() => {
+                  if (patientPrescriptions.length > 0) {
+                    setSelectedPrescription(patientPrescriptions[0]);
+                    setShowDispensingModal(true);
+                  }
+                }}
+              >
                 <Pill className="w-4 h-4 mr-2" />
                 Dispense Selected
               </Button>
@@ -139,28 +268,14 @@ export const PharmacyDispensing: React.FC = () => {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {/* Mock prescription data - would come from API */}
-              {[
-                {
-                  id: "1",
-                  medication: "Amoxicillin 500mg",
-                  dosage: "1 tablet",
-                  frequency: "3 times daily",
-                  duration: "7 days",
-                  status: "active",
-                },
-                {
-                  id: "2",
-                  medication: "Ibuprofen 400mg",
-                  dosage: "1 tablet",
-                  frequency: "As needed",
-                  duration: "10 days",
-                  status: "active",
-                },
-              ].map((prescription) => (
+              {patientPrescriptions.map((prescription) => (
                 <Card
-                  key={prescription.id}
-                  className="cursor-pointer hover:shadow-md transition-shadow"
+                  key={prescription._id}
+                  className={`cursor-pointer hover:shadow-md transition-shadow ${
+                    selectedPrescription?._id === prescription._id
+                      ? "ring-2 ring-blue-500"
+                      : ""
+                  }`}
                   onClick={() => setSelectedPrescription(prescription)}
                 >
                   <CardContent className="p-4">
@@ -171,25 +286,46 @@ export const PharmacyDispensing: React.FC = () => {
                         </div>
                         <div>
                           <h3 className="font-semibold">
-                            {prescription.medication}
+                            {prescription.title}
                           </h3>
                           <p className="text-sm text-gray-600">
-                            {prescription.dosage} • {prescription.frequency} •{" "}
-                            {prescription.duration}
+                            {prescription.description}
                           </p>
+                          {prescription.prescription && (
+                            <div className="mt-2">
+                              {prescription.prescription.medications.map(
+                                (med, index) => (
+                                  <div
+                                    key={index}
+                                    className="text-xs text-gray-500"
+                                  >
+                                    {med.name} - {med.dosage} • {med.frequency}{" "}
+                                    • {med.duration}
+                                  </div>
+                                )
+                              )}
+                            </div>
+                          )}
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
                         <span
                           className={`px-2 py-1 rounded-full text-xs font-medium ${
-                            prescription.status === "active"
+                            prescription.prescription?.status === "active"
                               ? "bg-green-100 text-green-800"
                               : "bg-gray-100 text-gray-800"
                           }`}
                         >
-                          {prescription.status}
+                          {prescription.prescription?.status}
                         </span>
-                        <Button size="sm" variant="outline">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setSelectedPrescription(prescription);
+                            setShowDispensingModal(true);
+                          }}
+                        >
                           Select
                         </Button>
                       </div>
@@ -202,7 +338,7 @@ export const PharmacyDispensing: React.FC = () => {
         </Card>
       )}
 
-      {/* Inventory Overview - From Storyboard */}
+      {/* Inventory Overview */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
@@ -249,7 +385,9 @@ export const PharmacyDispensing: React.FC = () => {
                         )}
                       </div>
                     </td>
-                    <td className="py-3">${item.price.toFixed(2)}</td>
+                    <td className="py-3">
+                      ${item.price?.toFixed(2) || "0.00"}
+                    </td>
                     <td className="py-3">
                       <span
                         className={`px-2 py-1 rounded-full text-xs font-medium ${
@@ -275,7 +413,10 @@ export const PharmacyDispensing: React.FC = () => {
       {showDispensingModal && selectedPrescription && (
         <DispensingModal
           prescription={selectedPrescription}
+          patientId={patientId}
           onDispense={handleDispense}
+          onPrint={handlePrintReceipt}
+          onInteractionCheck={handleDrugInteractionCheck}
           onClose={() => {
             setShowDispensingModal(false);
             setSelectedPrescription(null);
@@ -286,35 +427,95 @@ export const PharmacyDispensing: React.FC = () => {
   );
 };
 
-// Dispensing Modal Component - From Storyboard Panel 5-8
+// Dispensing Modal Component
 const DispensingModal: React.FC<{
-  prescription: any;
-  onDispense: (data: any) => void;
+  prescription: IMedicalRecord;
+  patientId: string;
+  onDispense: (data: any) => Promise<any>;
+  onPrint: (transaction: any) => void;
+  onInteractionCheck: (medications: string[]) => Promise<string[]>;
   onClose: () => void;
-}> = ({ prescription, onDispense, onClose }) => {
+}> = ({
+  prescription,
+  patientId,
+  onDispense,
+  onPrint,
+  onInteractionCheck,
+  onClose,
+}) => {
   const [step, setStep] = useState<"validation" | "preparation" | "completion">(
     "validation"
   );
   const [interactions, setInteractions] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [transaction, setTransaction] = useState<any>(null);
 
   const handleCheckInteractions = async () => {
-    // Mock interaction check - would be API call in real app
-    setInteractions(["No significant interactions found"]);
-    setStep("preparation");
+    setLoading(true);
+    try {
+      const medicationNames =
+        prescription.prescription?.medications.map((med) => med.name) || [];
+      const interactionResults = await onInteractionCheck(medicationNames);
+      setInteractions(interactionResults);
+      setStep("preparation");
+    } catch (error) {
+      console.error("Interaction check failed:", error);
+      setInteractions(["Error checking interactions"]);
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleCompleteDispensing = () => {
-    onDispense({
-      prescriptionId: prescription.id,
-      patientId: "patient123",
-      medications: [
-        {
-          medicationId: "med123",
-          quantity: 1,
-        },
-      ],
-    });
-    setStep("completion");
+  const handleCompleteDispensing = async () => {
+    setLoading(true);
+    try {
+      if (!prescription.prescription) {
+        throw new Error("No prescription data available");
+      }
+
+      const dispenseData = {
+        prescriptionId: prescription._id!,
+        patientId: patientId,
+        pharmacistId: "PHA001", // This should come from auth context in real app
+        medications: prescription.prescription.medications.map((med) => ({
+          medicationId: med.medicationId,
+          name: med.name,
+          quantity: 1, // Default quantity
+          batchNumber: "BATCH001", // This should come from inventory
+          price: 12.5, // This should come from inventory
+        })),
+        paymentMethod: "cash",
+      };
+
+      const result = await onDispense(dispenseData);
+      setTransaction(result);
+      setStep("completion");
+    } catch (error) {
+      console.error("Dispensing failed:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePrint = () => {
+    if (transaction) {
+      onPrint(transaction);
+    } else {
+      // Create mock transaction for printing
+      const mockTransaction = {
+        _id: "TX-" + Date.now(),
+        patientId: patientId,
+        medications:
+          prescription.prescription?.medications.map((med) => ({
+            name: med.name,
+            quantity: 1,
+            price: 12.5,
+          })) || [],
+        amount: 12.5,
+        paymentStatus: "completed",
+      };
+      onPrint(mockTransaction);
+    }
   };
 
   return (
@@ -372,47 +573,62 @@ const DispensingModal: React.FC<{
                 </h3>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span>Medication:</span>
-                    <span className="font-medium">
-                      {prescription.medication}
+                    <span>Patient ID:</span>
+                    <span className="font-medium">{patientId}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Prescription:</span>
+                    <span className="font-medium">{prescription.title}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Issued Date:</span>
+                    <span>
+                      {new Date(prescription.createdDate).toLocaleDateString()}
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Dosage:</span>
-                    <span>{prescription.dosage}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Frequency:</span>
-                    <span>{prescription.frequency}</span>
-                  </div>
-                  <div className="flex justify-between">
                     <span>Status:</span>
-                    <span className="text-green-600 font-medium">Active</span>
+                    <span className="text-green-600 font-medium">
+                      {prescription.prescription?.status}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {interactions.length > 0 && (
-                <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                  <h3 className="font-semibold text-yellow-900 mb-2 flex items-center">
-                    <AlertTriangle className="w-4 h-4 mr-2" />
-                    Drug Interactions Check
-                  </h3>
+              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+                <h3 className="font-semibold text-yellow-900 mb-2 flex items-center">
+                  <AlertTriangle className="w-4 h-4 mr-2" />
+                  Drug Interactions Check
+                </h3>
+                {interactions.length > 0 ? (
                   <ul className="text-sm space-y-1">
                     {interactions.map((interaction, index) => (
                       <li key={index}>• {interaction}</li>
                     ))}
                   </ul>
-                </div>
-              )}
+                ) : (
+                  <p className="text-sm text-yellow-700">
+                    No interactions checked yet. Click below to check.
+                  </p>
+                )}
+              </div>
 
               <div className="flex justify-end space-x-3">
                 <Button variant="outline" onClick={onClose}>
                   Cancel
                 </Button>
-                <Button onClick={handleCheckInteractions}>
-                  <CheckCircle className="w-4 h-4 mr-2" />
-                  Validate & Continue
+                <Button onClick={handleCheckInteractions} disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Checking...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle className="w-4 h-4 mr-2" />
+                      Validate & Continue
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -428,21 +644,27 @@ const DispensingModal: React.FC<{
                   </h3>
                 </div>
                 <p className="text-sm text-green-700 mt-1">
-                  No interactions found. Ready for dispensing.
+                  {interactions.length > 0 &&
+                  interactions[0] !== "No significant interactions found"
+                    ? "Interactions found. Please review."
+                    : "No significant interactions found. Ready for dispensing."}
                 </p>
               </div>
 
               <div className="border rounded-lg p-4">
                 <h3 className="font-semibold mb-3">Medication Preparation</h3>
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded">
-                    <span className="font-medium">
-                      {prescription.medication}
-                    </span>
-                    <span className="text-sm text-gray-600">In stock</span>
-                  </div>
-                  <div className="flex items-center space-x-2 text-sm">
-                    <Pill className="w-4 h-4 text-gray-400" />
+                  {prescription.prescription?.medications.map((med, index) => (
+                    <div
+                      key={index}
+                      className="flex items-center justify-between p-3 bg-gray-50 rounded"
+                    >
+                      <span className="font-medium">{med.name}</span>
+                      <span className="text-sm text-green-600">In stock</span>
+                    </div>
+                  ))}
+                  <div className="flex items-center space-x-2 text-sm text-gray-600">
+                    <Pill className="w-4 h-4" />
                     <span>Preparing medication for dispensing...</span>
                   </div>
                 </div>
@@ -452,9 +674,18 @@ const DispensingModal: React.FC<{
                 <Button variant="outline" onClick={() => setStep("validation")}>
                   Back
                 </Button>
-                <Button onClick={handleCompleteDispensing}>
-                  <ShoppingCart className="w-4 h-4 mr-2" />
-                  Complete Dispensing
+                <Button onClick={handleCompleteDispensing} disabled={loading}>
+                  {loading ? (
+                    <>
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      Dispensing...
+                    </>
+                  ) : (
+                    <>
+                      <ShoppingCart className="w-4 h-4 mr-2" />
+                      Complete Dispensing
+                    </>
+                  )}
                 </Button>
               </div>
             </div>
@@ -479,8 +710,12 @@ const DispensingModal: React.FC<{
                 <h4 className="font-semibold mb-2">Transaction Details</h4>
                 <div className="space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span>Medication:</span>
-                    <span>{prescription.medication}</span>
+                    <span>Prescription:</span>
+                    <span>{prescription.title}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Patient ID:</span>
+                    <span>{patientId}</span>
                   </div>
                   <div className="flex justify-between">
                     <span>Dispensed At:</span>
@@ -488,14 +723,20 @@ const DispensingModal: React.FC<{
                   </div>
                   <div className="flex justify-between">
                     <span>Transaction ID:</span>
-                    <span>TX-{Date.now()}</span>
+                    <span>{transaction?._id || "TX-" + Date.now()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span>Amount:</span>
+                    <span className="font-semibold">
+                      ${transaction?.amount || "12.50"}
+                    </span>
                   </div>
                 </div>
               </div>
 
               <div className="flex justify-end space-x-3">
-                <Button onClick={onClose}>
-                  <FileText className="w-4 h-4 mr-2" />
+                <Button onClick={handlePrint}>
+                  <Printer className="w-4 h-4 mr-2" />
                   Print Receipt
                 </Button>
                 <Button variant="outline" onClick={onClose}>

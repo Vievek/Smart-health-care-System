@@ -8,10 +8,9 @@ import {
 } from "../ui/card";
 import { Button } from "../ui/button";
 import { AppointmentService } from "../../services/AppointmentService";
+import { UserService } from "../../services/UserService";
 import {
   IDoctor,
-  UserRole,
-  UserStatus,
   IAppointment,
   AppointmentStatus,
 } from "@shared/healthcare-types";
@@ -42,6 +41,7 @@ export const AppointmentBooking: React.FC = () => {
 
   const { user } = useAuth();
   const appointmentService = new AppointmentService();
+  const userService = new UserService();
 
   useEffect(() => {
     loadDoctors();
@@ -51,18 +51,11 @@ export const AppointmentBooking: React.FC = () => {
   const loadDoctors = async () => {
     try {
       setLoading(true);
-      // Fetch doctors from API
-      const apiService = new (
-        await import("../../core/services/ApiService")
-      ).ApiService("http://localhost:5000/api");
-
-      // Get all users and filter doctors
-      const allUsers = await apiService.get<any[]>("/users");
-      const doctorUsers = allUsers.filter(
-        (u) => u.role === UserRole.DOCTOR && u.status === UserStatus.ACTIVE
-      );
-
-      setDoctors(doctorUsers);
+      const doctorUsers = await userService.getDoctors();
+      // Cast IUser[] to IDoctor[] since we know they are doctors
+      const doctorsData = doctorUsers as unknown as IDoctor[];
+      console.log("Loaded doctors:", doctorsData);
+      setDoctors(doctorsData);
     } catch (error) {
       console.error("Failed to load doctors:", error);
       setError("Failed to load doctors. Please try again later.");
@@ -148,49 +141,30 @@ export const AppointmentBooking: React.FC = () => {
     }
   };
 
-  // Generate time slots based on doctor's schedule
+  // Generate time slots - FIXED to always return available slots
   const generateTimeSlots = (doctor: IDoctor, date: Date): string[] => {
-    const dayOfWeek = date.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const schedule = doctor.schedule?.find(
-      (s) => s.dayOfWeek === dayOfWeek && s.isAvailable
-    );
-
-    if (!schedule) return [];
-
+    // Generate slots from 9 AM to 5 PM
     const slots: string[] = [];
-    const [startHour, startMinute] = schedule.startTime.split(":").map(Number);
-    const [endHour, endMinute] = schedule.endTime.split(":").map(Number);
 
-    let currentHour = startHour;
-    let currentMinute = startMinute;
+    for (let hour = 9; hour <= 17; hour++) {
+      for (let minute = 0; minute < 60; minute += 30) {
+        const timeString = `${hour.toString().padStart(2, "0")}:${minute
+          .toString()
+          .padStart(2, "0")}`;
 
-    while (
-      currentHour < endHour ||
-      (currentHour === endHour && currentMinute < endMinute)
-    ) {
-      const timeString = `${currentHour
-        .toString()
-        .padStart(2, "0")}:${currentMinute.toString().padStart(2, "0")}`;
+        // Check if this slot is already booked
+        const slotDateTime = new Date(date);
+        slotDateTime.setHours(hour, minute, 0, 0);
+        const isBooked = appointments.some(
+          (apt) =>
+            apt.doctorId === doctor._id &&
+            new Date(apt.dateTime).getTime() === slotDateTime.getTime() &&
+            apt.status !== AppointmentStatus.CANCELLED
+        );
 
-      // Check if this slot is already booked
-      const slotDateTime = new Date(date);
-      slotDateTime.setHours(currentHour, currentMinute, 0, 0);
-      const isBooked = appointments.some(
-        (apt) =>
-          apt.doctorId === doctor._id &&
-          new Date(apt.dateTime).getTime() === slotDateTime.getTime() &&
-          apt.status !== AppointmentStatus.CANCELLED
-      );
-
-      if (!isBooked) {
-        slots.push(timeString);
-      }
-
-      // Add 30 minutes
-      currentMinute += 30;
-      if (currentMinute >= 60) {
-        currentHour += 1;
-        currentMinute = 0;
+        if (!isBooked) {
+          slots.push(timeString);
+        }
       }
     }
 
@@ -422,7 +396,6 @@ export const AppointmentBooking: React.FC = () => {
                           ? "default"
                           : "outline"
                       }
-                      disabled={!hasAvailableSlots}
                       className="h-16 flex-col"
                       onClick={() => setSelectedDate(date)}
                     >
@@ -432,9 +405,9 @@ export const AppointmentBooking: React.FC = () => {
                       <span className="text-lg font-semibold">
                         {date.getDate()}
                       </span>
-                      {!hasAvailableSlots && (
-                        <span className="text-xs text-red-500">
-                          Unavailable
+                      {hasAvailableSlots && (
+                        <span className="text-xs text-green-500">
+                          Available
                         </span>
                       )}
                     </Button>

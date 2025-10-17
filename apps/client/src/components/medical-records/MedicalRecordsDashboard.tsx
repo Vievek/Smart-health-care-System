@@ -16,6 +16,7 @@ import {
   Stethoscope,
   User,
   Search,
+  Eye,
 } from "lucide-react";
 
 interface MedicalRecordsDashboardProps {
@@ -31,6 +32,7 @@ export const MedicalRecordsDashboard: React.FC<
     null
   );
   const [searchTerm, setSearchTerm] = useState("");
+  const [patientSearchId, setPatientSearchId] = useState("");
 
   const medicalRecordService = new MedicalRecordService();
 
@@ -40,8 +42,13 @@ export const MedicalRecordsDashboard: React.FC<
 
   const loadRecords = async () => {
     try {
-      const data = await medicalRecordService.getRecords();
-       console.log("Loaded medical records:", data);
+      let data;
+      if (userRole === UserRole.DOCTOR && patientSearchId) {
+        data = await medicalRecordService.getRecords(patientSearchId);
+      } else {
+        data = await medicalRecordService.getRecords();
+      }
+      console.log("Loaded medical records:", data);
       setRecords(data);
     } catch (error) {
       console.error("Failed to load records:", error);
@@ -53,15 +60,26 @@ export const MedicalRecordsDashboard: React.FC<
   const handleDownloadPDF = async (recordId: string) => {
     try {
       const blob = await medicalRecordService.downloadRecordPDF(recordId);
-      const url = window.URL.createObjectURL(blob);
+
+      // Create a proper PDF blob
+      const pdfBlob = new Blob([blob], { type: "application/pdf" });
+      const url = window.URL.createObjectURL(pdfBlob);
       const a = document.createElement("a");
       a.href = url;
       a.download = `medical-record-${recordId}.pdf`;
+      document.body.appendChild(a);
       a.click();
+      document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (error) {
       console.error("Failed to download PDF:", error);
+      alert("Failed to download PDF. Please try again.");
     }
+  };
+
+  const handlePatientSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    loadRecords();
   };
 
   const filteredRecords = records.filter(
@@ -80,7 +98,7 @@ export const MedicalRecordsDashboard: React.FC<
 
   return (
     <div className="container mx-auto p-6 space-y-6">
-      {/* Header Section - Exact from Storyboard Frame 4 */}
+      {/* Header Section */}
       <div className="flex justify-between items-center">
         <div>
           <h1 className="text-3xl font-bold text-gray-900">Medical Records</h1>
@@ -96,7 +114,7 @@ export const MedicalRecordsDashboard: React.FC<
         )}
       </div>
 
-      {/* Search Bar - From Storyboard Frame 4 */}
+      {/* Search Bar */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
         <div className="flex items-center space-x-4">
           <div className="flex-1">
@@ -111,6 +129,27 @@ export const MedicalRecordsDashboard: React.FC<
               />
             </div>
           </div>
+
+          {/* Doctor Patient Search */}
+          {userRole === UserRole.DOCTOR && (
+            <form
+              onSubmit={handlePatientSearch}
+              className="flex items-center space-x-2"
+            >
+              <input
+                type="text"
+                placeholder="Patient ID..."
+                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                value={patientSearchId}
+                onChange={(e) => setPatientSearchId(e.target.value)}
+              />
+              <Button type="submit" variant="outline">
+                <Search className="w-4 h-4 mr-2" />
+                Search Patient
+              </Button>
+            </form>
+          )}
+
           {userRole === UserRole.PATIENT && (
             <Button variant="outline">
               <Calendar className="w-4 h-4 mr-2" />
@@ -120,16 +159,17 @@ export const MedicalRecordsDashboard: React.FC<
         </div>
       </div>
 
-      {/* Records Grid - From Storyboard Frame 5 */}
+      {/* Records Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         {filteredRecords.map((record) => (
           <Card
             key={record._id}
-            className="cursor-pointer hover:shadow-lg transition-shadow"
+            className="hover:shadow-lg transition-shadow cursor-pointer"
+            onClick={() => setSelectedRecord(record)}
           >
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-semibold">
+                <CardTitle className="text-lg font-semibold flex items-center">
                   {getRecordIcon(record.recordType)}
                   {record.title}
                 </CardTitle>
@@ -160,24 +200,48 @@ export const MedicalRecordsDashboard: React.FC<
                   <User className="w-4 h-4 mr-1" />
                   Dr. {record.authorId}
                 </div>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDownloadPDF(record._id!);
-                  }}
-                >
-                  <Download className="w-4 h-4 mr-1" />
-                  PDF
-                </Button>
+                <div className="flex space-x-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedRecord(record);
+                    }}
+                  >
+                    <Eye className="w-4 h-4 mr-1" />
+                    View
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDownloadPDF(record._id!);
+                    }}
+                  >
+                    <Download className="w-4 h-4 mr-1" />
+                    PDF
+                  </Button>
+                </div>
               </div>
             </CardContent>
           </Card>
         ))}
       </div>
 
-      {/* Admission History Section - From Storyboard Frame 6 */}
+      {/* No Records Message */}
+      {filteredRecords.length === 0 && (
+        <Card>
+          <CardContent className="p-8 text-center">
+            <p className="text-gray-500">
+              No medical records found matching your criteria.
+            </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Admission History Section */}
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center">
@@ -201,12 +265,22 @@ export const MedicalRecordsDashboard: React.FC<
                       {admission.visitDetails?.diagnosis || "General admission"}
                     </p>
                   </div>
-                  <Button variant="outline" size="sm">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleDownloadPDF(admission._id!)}
+                  >
                     <Download className="w-4 h-4 mr-1" />
                     Download
                   </Button>
                 </div>
               ))}
+            {records.filter((record) => record.recordType === "admission")
+              .length === 0 && (
+              <p className="text-center text-gray-500 py-4">
+                No admission history found.
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -248,9 +322,12 @@ const RecordDetailModal: React.FC<{
         <div className="p-6 border-b">
           <div className="flex justify-between items-center">
             <h2 className="text-2xl font-bold">{record.title}</h2>
-            <Button variant="ghost" onClick={onClose}>
+            <button
+              onClick={onClose}
+              className="text-gray-500 hover:text-gray-700 text-2xl"
+            >
               ×
-            </Button>
+            </button>
           </div>
         </div>
 
@@ -258,24 +335,42 @@ const RecordDetailModal: React.FC<{
           {/* Record Details */}
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="font-semibold">Record Type:</label>
-              <p>{record.recordType}</p>
+              <label className="font-semibold block">Record Type:</label>
+              <p className="capitalize">{record.recordType}</p>
             </div>
             <div>
-              <label className="font-semibold">Created Date:</label>
+              <label className="font-semibold block">Created Date:</label>
               <p>{new Date(record.createdDate).toLocaleDateString()}</p>
             </div>
+            <div>
+              <label className="font-semibold block">Patient ID:</label>
+              <p>{record.patientId}</p>
+            </div>
+            <div>
+              <label className="font-semibold block">Author ID:</label>
+              <p>{record.authorId}</p>
+            </div>
           </div>
+
+          {/* Description */}
+          {record.description && (
+            <div>
+              <label className="font-semibold block">Description:</label>
+              <p className="mt-1">{record.description}</p>
+            </div>
+          )}
 
           {/* Prescription Details */}
           {record.prescription && (
             <div className="border rounded-lg p-4">
-              <h3 className="font-semibold mb-3">Prescription Details</h3>
-              <div className="space-y-2">
+              <h3 className="font-semibold mb-3 text-lg">
+                Prescription Details
+              </h3>
+              <div className="space-y-3">
                 {record.prescription.medications.map((med, index) => (
                   <div
                     key={index}
-                    className="flex justify-between items-center p-2 bg-gray-50 rounded"
+                    className="flex justify-between items-center p-3 bg-gray-50 rounded"
                   >
                     <div>
                       <span className="font-medium">{med.name}</span>
@@ -283,30 +378,86 @@ const RecordDetailModal: React.FC<{
                         {med.dosage} • {med.frequency}
                       </span>
                     </div>
-                    <span className="text-sm">{med.duration}</span>
+                    <span className="text-sm bg-blue-100 text-blue-800 px-2 py-1 rounded">
+                      {med.duration}
+                    </span>
                   </div>
                 ))}
               </div>
-              <p className="mt-3 text-sm">{record.prescription.instructions}</p>
+              {record.prescription.instructions && (
+                <div className="mt-3 p-3 bg-yellow-50 rounded">
+                  <label className="font-semibold block text-yellow-800">
+                    Instructions:
+                  </label>
+                  <p className="text-sm text-yellow-700">
+                    {record.prescription.instructions}
+                  </p>
+                </div>
+              )}
             </div>
           )}
 
           {/* Lab Results */}
           {record.labResults && (
             <div className="border rounded-lg p-4">
-              <h3 className="font-semibold mb-3">
+              <h3 className="font-semibold mb-3 text-lg">
                 Lab Results: {record.labResults.testName}
               </h3>
               <div className="space-y-2">
                 {Object.entries(record.labResults.results).map(
                   ([key, value]) => (
-                    <div key={key} className="flex justify-between">
-                      <span>{key}:</span>
-                      <span className="font-medium">
-                        {value} {record.labResults?.units[key]}
-                      </span>
+                    <div
+                      key={key}
+                      className="flex justify-between items-center py-2 border-b"
+                    >
+                      <span className="font-medium capitalize">{key}:</span>
+                      <div className="text-right">
+                        <span className="font-medium">
+                          {value} {record.labResults?.units[key]}
+                        </span>
+                        <div className="text-xs text-gray-500">
+                          Normal: {record.labResults?.normalRange[key]}
+                        </div>
+                      </div>
                     </div>
                   )
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Visit Details */}
+          {record.visitDetails && (
+            <div className="border rounded-lg p-4">
+              <h3 className="font-semibold mb-3 text-lg">Visit Details</h3>
+              <div className="space-y-3">
+                {record.visitDetails.diagnosis && (
+                  <div>
+                    <label className="font-semibold block">Diagnosis:</label>
+                    <p>{record.visitDetails.diagnosis}</p>
+                  </div>
+                )}
+                {record.visitDetails.symptoms &&
+                  record.visitDetails.symptoms.length > 0 && (
+                    <div>
+                      <label className="font-semibold block">Symptoms:</label>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {record.visitDetails.symptoms.map((symptom, index) => (
+                          <span
+                            key={index}
+                            className="bg-gray-100 text-gray-800 px-2 py-1 rounded text-sm"
+                          >
+                            {symptom}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                {record.visitDetails.notes && (
+                  <div>
+                    <label className="font-semibold block">Notes:</label>
+                    <p className="mt-1">{record.visitDetails.notes}</p>
+                  </div>
                 )}
               </div>
             </div>
