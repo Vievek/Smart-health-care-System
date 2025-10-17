@@ -31,7 +31,7 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         name: "Ward Management",
         href: "/wards",
         icon: Bed,
-        roles: ["nurse", "ward_clerk", "admin", "patient"], // Added patient for bed view
+        roles: ["nurse", "ward_clerk", "admin", "patient"],
       },
       {
         name: "Pharmacy",
@@ -74,7 +74,10 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
           defaultRoute = "/appointments";
         }
 
-        navigate(defaultRoute);
+        // Only redirect if we're not already on the default route
+        if (currentPath !== defaultRoute) {
+          navigate(defaultRoute);
+        }
       }
     }
   }, [user, location, navigate, navigation]);

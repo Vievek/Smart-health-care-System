@@ -13,6 +13,7 @@ import {
   IDoctor,
   IAppointment,
   AppointmentStatus,
+  IUser,
 } from "@shared/healthcare-types";
 import { useAuth } from "../../contexts/AuthContext";
 import {
@@ -28,6 +29,7 @@ import {
 
 export const AppointmentBooking: React.FC = () => {
   const [doctors, setDoctors] = useState<IDoctor[]>([]);
+  const [patients, setPatients] = useState<IUser[]>([]);
   const [selectedDoctor, setSelectedDoctor] = useState<IDoctor | null>(null);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<string | null>(null);
@@ -47,13 +49,15 @@ export const AppointmentBooking: React.FC = () => {
   useEffect(() => {
     loadDoctors();
     loadAppointments();
-  }, []);
+    if (user?.role === "doctor") {
+      loadPatients();
+    }
+  }, [user]);
 
   const loadDoctors = async () => {
     try {
       setLoading(true);
       const doctorUsers = await userService.getDoctors();
-      // Cast IUser[] to IDoctor[] since we know they are doctors
       const doctorsData = doctorUsers as unknown as IDoctor[];
       console.log("Loaded doctors:", doctorsData);
       setDoctors(doctorsData);
@@ -65,6 +69,16 @@ export const AppointmentBooking: React.FC = () => {
     }
   };
 
+  const loadPatients = async () => {
+    try {
+      const allUsers = await userService.getAll();
+      const patientUsers = allUsers.filter((u) => u.role === "patient");
+      setPatients(patientUsers);
+    } catch (error) {
+      console.error("Failed to load patients:", error);
+    }
+  };
+
   const loadAppointments = async () => {
     try {
       const data = await appointmentService.getAppointments();
@@ -72,6 +86,13 @@ export const AppointmentBooking: React.FC = () => {
     } catch (error) {
       console.error("Failed to load appointments:", error);
     }
+  };
+
+  const getPatientName = (patientId: string) => {
+    const patient = patients.find((p) => p._id === patientId);
+    return patient
+      ? `${patient.firstName} ${patient.lastName}`
+      : `Patient ${patientId}`;
   };
 
   const handleDoctorSelect = (doctor: IDoctor) => {
@@ -306,7 +327,9 @@ export const AppointmentBooking: React.FC = () => {
                           <div>
                             <h3 className="font-semibold">
                               {user?.role === "doctor"
-                                ? `Patient: ${appointment.patientId}`
+                                ? `Patient: ${getPatientName(
+                                    appointment.patientId
+                                  )}`
                                 : `Dr. ${
                                     doctors.find(
                                       (d) => d._id === appointment.doctorId

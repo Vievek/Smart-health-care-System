@@ -8,7 +8,8 @@ import {
 } from "../ui/card";
 import { Button } from "../ui/button";
 import { MedicalRecordService } from "../../services/MedicalRecordService";
-import { IMedicalRecord, UserRole } from "@shared/healthcare-types";
+import { UserService } from "../../services/UserService";
+import { IMedicalRecord, UserRole, IUser } from "@shared/healthcare-types";
 import {
   FileText,
   Download,
@@ -28,30 +29,36 @@ export const MedicalRecordsDashboard: React.FC<
   MedicalRecordsDashboardProps
 > = ({ userRole }) => {
   const [records, setRecords] = useState<IMedicalRecord[]>([]);
+  const [allRecords, setAllRecords] = useState<IMedicalRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedRecord, setSelectedRecord] = useState<IMedicalRecord | null>(
     null
   );
   const [searchTerm, setSearchTerm] = useState("");
   const [patientSearchId, setPatientSearchId] = useState("");
-  const [dateFilter, setDateFilter] = useState("");
+  const [dateFilter, setDateFilter] = useState("all");
+  const [patientSearchResults, setPatientSearchResults] = useState<IUser[]>([]);
+  const [showPatientSearch, setShowPatientSearch] = useState(false);
 
   const medicalRecordService = new MedicalRecordService();
+  const userService = new UserService();
 
   useEffect(() => {
     loadRecords();
   }, []);
 
-  const loadRecords = async () => {
+  const loadRecords = async (patientId?: string) => {
     try {
+      setLoading(true);
       let data;
-      if (userRole === UserRole.DOCTOR && patientSearchId) {
-        data = await medicalRecordService.getRecords(patientSearchId);
+      if (userRole === UserRole.DOCTOR && patientId) {
+        data = await medicalRecordService.getRecords(patientId);
       } else {
         data = await medicalRecordService.getRecords();
       }
       console.log("Loaded medical records:", data);
       setRecords(data);
+      setAllRecords(data); // Store all records for filtering
     } catch (error) {
       console.error("Failed to load records:", error);
     } finally {
@@ -79,27 +86,81 @@ export const MedicalRecordsDashboard: React.FC<
     }
   };
 
-  const handlePatientSearch = (e: React.FormEvent) => {
+  const handlePatientSearch = async (e: React.FormEvent) => {
     e.preventDefault();
-    loadRecords();
+    if (!patientSearchId.trim()) {
+      alert("Please enter a patient name or ID");
+      return;
+    }
+
+    try {
+      setLoading(true);
+      // Search patients by name or ID
+      const allUsers = await userService.getUsersByRole(UserRole.PATIENT);
+      const filteredPatients = allUsers.filter(
+        (patient) =>
+          patient.firstName
+            .toLowerCase()
+            .includes(patientSearchId.toLowerCase()) ||
+          patient.lastName
+            .toLowerCase()
+            .includes(patientSearchId.toLowerCase()) ||
+          patient.nationalId
+            .toLowerCase()
+            .includes(patientSearchId.toLowerCase()) ||
+          patient._id?.toLowerCase().includes(patientSearchId.toLowerCase())
+      );
+
+      setPatientSearchResults(filteredPatients);
+      setShowPatientSearch(true);
+    } catch (error: any) {
+      console.error("Failed to search patients:", error);
+      alert("Failed to search patients. Please try again.");
+    } finally {
+      setLoading(false);
+    }
   };
 
-  const handleDateFilter = (days: number) => {
-    if (days === 0) {
-      setDateFilter("");
-      loadRecords();
+  const handleSelectPatient = (patient: IUser) => {
+    setPatientSearchId(
+      `${patient.firstName} ${patient.lastName} (${patient.nationalId})`
+    );
+    setShowPatientSearch(false);
+    loadRecords(patient._id);
+  };
+
+  const handleDateFilter = (filter: string) => {
+    setDateFilter(filter);
+
+    if (filter === "all") {
+      setRecords(allRecords);
       return;
     }
 
     const filterDate = new Date();
-    filterDate.setDate(filterDate.getDate() - days);
-    setDateFilter(filterDate.toISOString());
+    let daysToSubtract = 0;
 
-    // Filter records locally
-    const filtered = records.filter(
-      (record) => new Date(record.createdDate) >= filterDate
-    );
-    setRecords(filtered);
+    switch (filter) {
+      case "7":
+        daysToSubtract = 7;
+        break;
+      case "30":
+        daysToSubtract = 30;
+        break;
+      case "90":
+        daysToSubtract = 90;
+        break;
+      default:
+        daysToSubtract = 0;
+    }
+
+    if (daysToSubtract > 0) {
+      filterDate.setDate(filterDate.getDate() - daysToSubtract);
+      const filtered = allRecords.filter(
+        (record) => new Date(record.createdDate) >= filterDate
+      );
+      setRecords(filtered);
+    }
   };
 
   const filteredRecords = records.filter(
@@ -129,12 +190,70 @@ export const MedicalRecordsDashboard: React.FC<
           </p>
         </div>
         {userRole === UserRole.DOCTOR && (
-          <Button className="bg-blue-600 hover:bg-blue-700">
+          <Button
+            className="bg-blue-600 hover:bg-blue-700"
+            onClick={() => setShowPatientSearch(!showPatientSearch)}
+          >
             <Search className="w-4 h-4 mr-2" />
-            Search Patients
+            {showPatientSearch ? "Hide Search" : "Search Patients"}
           </Button>
         )}
       </div>
+
+      {/* Patient Search for Doctors */}
+      {userRole === UserRole.DOCTOR && showPatientSearch && (
+        <Card>
+          <CardContent className="p-4">
+            <form onSubmit={handlePatientSearch} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Search Patient by Name or ID
+                </label>
+                <div className="flex space-x-2">
+                  <input
+                    type="text"
+                    placeholder="Enter patient name or ID..."
+                    className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                    value={patientSearchId}
+                    onChange={(e) => setPatientSearchId(e.target.value)}
+                  />
+                  <Button type="submit" disabled={!patientSearchId.trim()}>
+                    <Search className="w-4 h-4 mr-2" />
+                    Search
+                  </Button>
+                </div>
+              </div>
+
+              {patientSearchResults.length > 0 && (
+                <div className="border rounded-lg p-3">
+                  <h4 className="font-semibold mb-2">Select Patient:</h4>
+                  <div className="space-y-2">
+                    {patientSearchResults.map((patient) => (
+                      <div
+                        key={patient._id}
+                        className="flex items-center justify-between p-2 hover:bg-gray-50 rounded cursor-pointer"
+                        onClick={() => handleSelectPatient(patient)}
+                      >
+                        <div>
+                          <p className="font-medium">
+                            {patient.firstName} {patient.lastName}
+                          </p>
+                          <p className="text-sm text-gray-600">
+                            ID: {patient.nationalId} | {patient.phone}
+                          </p>
+                        </div>
+                        <Button size="sm" variant="outline">
+                          Select
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </form>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Search Bar */}
       <div className="bg-white rounded-lg border border-gray-200 p-4">
@@ -152,35 +271,15 @@ export const MedicalRecordsDashboard: React.FC<
             </div>
           </div>
 
-          {/* Doctor Patient Search */}
-          {userRole === UserRole.DOCTOR && (
-            <form
-              onSubmit={handlePatientSearch}
-              className="flex items-center space-x-2"
-            >
-              <input
-                type="text"
-                placeholder="Patient ID..."
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                value={patientSearchId}
-                onChange={(e) => setPatientSearchId(e.target.value)}
-              />
-              <Button type="submit" variant="outline">
-                <Search className="w-4 h-4 mr-2" />
-                Search Patient
-              </Button>
-            </form>
-          )}
-
           {/* Date Filter */}
           <div className="flex items-center space-x-2">
             <Filter className="w-4 h-4 text-gray-500" />
             <select
               value={dateFilter}
-              onChange={(e) => handleDateFilter(parseInt(e.target.value))}
+              onChange={(e) => handleDateFilter(e.target.value)}
               className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="0">All Dates</option>
+              <option value="all">All Dates</option>
               <option value="7">Last 7 days</option>
               <option value="30">Last 30 days</option>
               <option value="90">Last 90 days</option>
@@ -228,7 +327,7 @@ export const MedicalRecordsDashboard: React.FC<
               <div className="flex items-center justify-between">
                 <div className="flex items-center text-sm text-gray-500">
                   <User className="w-4 h-4 mr-1" />
-                  Dr. {record.authorId}
+                  Author ID: {record.authorId}
                 </div>
                 <div className="flex space-x-2">
                   <Button
@@ -264,9 +363,15 @@ export const MedicalRecordsDashboard: React.FC<
       {filteredRecords.length === 0 && (
         <Card>
           <CardContent className="p-8 text-center">
+            <FileText className="w-16 h-16 text-gray-400 mx-auto mb-4" />
             <p className="text-gray-500">
               No medical records found matching your criteria.
             </p>
+            {userRole === UserRole.DOCTOR && (
+              <p className="text-sm text-gray-400 mt-2">
+                Use the patient search above to find and view patient records.
+              </p>
+            )}
           </CardContent>
         </Card>
       )}

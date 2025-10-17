@@ -6,6 +6,7 @@ export interface IUserService {
   getDoctors(): Promise<IUser[]>;
   getDoctorById(id: string): Promise<IUser | null>;
   getUsersByRole(role: UserRole): Promise<IUser[]>;
+  getAll(): Promise<IUser[]>; // Add this method
 }
 
 export class UserService implements IUserService {
@@ -13,6 +14,16 @@ export class UserService implements IUserService {
 
   constructor(apiService?: IApiService) {
     this.apiService = apiService || new ApiService("http://localhost:5000/api");
+  }
+
+  async getAll(): Promise<IUser[]> {
+    try {
+      const allUsers = await this.apiService.get<IUser[]>("/users");
+      return allUsers;
+    } catch (error) {
+      console.error("Failed to fetch users:", error);
+      throw error;
+    }
   }
 
   async getDoctors(): Promise<IUser[]> {

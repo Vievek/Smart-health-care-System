@@ -8,14 +8,16 @@ import {
 } from "../ui/card";
 import { Button } from "../ui/button";
 import { WardService } from "../../services/WardService";
+import { UserService } from "../../services/UserService";
 import {
   IWard,
   IBed,
   BedStatus,
   WardType,
   UserRole,
+  IUser,
 } from "@shared/healthcare-types";
-import { Bed, Search, Filter, MapPin, User, Loader2, Plus } from "lucide-react";
+import { Bed, Search, Filter, MapPin, User, Loader2 } from "lucide-react";
 import { useAuth } from "../../contexts/AuthContext";
 
 export const WardManagement: React.FC = () => {
@@ -25,17 +27,22 @@ export const WardManagement: React.FC = () => {
   const [selectedWard, setSelectedWard] = useState<IWard | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [showAllocationModal, setShowAllocationModal] = useState(false);
-  const [showAddWardModal, setShowAddWardModal] = useState(false);
+  const [showTransferModal, setShowTransferModal] = useState(false);
   const [selectedBed, setSelectedBed] = useState<IBed | null>(null);
   const [loading, setLoading] = useState(false);
   const [patientBeds, setPatientBeds] = useState<IBed[]>([]);
+  const [patients, setPatients] = useState<IUser[]>([]);
+  const [patientSearchTerm, setPatientSearchTerm] = useState("");
+  const [selectedPatient, setSelectedPatient] = useState<IUser | null>(null);
 
   const { user } = useAuth();
   const wardService = new WardService();
+  const userService = new UserService();
 
   useEffect(() => {
     loadWards();
     loadAllBeds();
+    loadPatients();
     if (user?.role === UserRole.PATIENT) {
       loadPatientBeds();
     }
@@ -68,6 +75,16 @@ export const WardManagement: React.FC = () => {
     }
   };
 
+  const loadPatients = async () => {
+    try {
+      const allUsers = await userService.getAll();
+      const patientUsers = allUsers.filter((u) => u.role === UserRole.PATIENT);
+      setPatients(patientUsers);
+    } catch (error) {
+      console.error("Failed to load patients:", error);
+    }
+  };
+
   const loadPatientBeds = async () => {
     try {
       if (user?._id) {
@@ -85,7 +102,9 @@ export const WardManagement: React.FC = () => {
       await loadAllBeds();
       await loadWards();
       setShowAllocationModal(false);
-      alert(`Bed allocated successfully to patient ${patientId}`);
+      setSelectedPatient(null);
+      setPatientSearchTerm("");
+      alert(`Bed allocated successfully!`);
     } catch (error: any) {
       console.error("Failed to allocate bed:", error);
       alert(`Failed to allocate bed: ${error.message}`);
@@ -100,6 +119,7 @@ export const WardManagement: React.FC = () => {
       await wardService.transferPatient(currentBedId, newBedId);
       await loadAllBeds();
       await loadWards();
+      setShowTransferModal(false);
       alert("Patient transferred successfully");
     } catch (error: any) {
       console.error("Failed to transfer patient:", error);
@@ -119,16 +139,11 @@ export const WardManagement: React.FC = () => {
     }
   };
 
-  const handleCreateWard = async (wardData: any) => {
-    try {
-      await wardService.createWard(wardData);
-      await loadWards();
-      setShowAddWardModal(false);
-      alert("Ward created successfully!");
-    } catch (error: any) {
-      console.error("Failed to create ward:", error);
-      alert(`Failed to create ward: ${error.message}`);
-    }
+  const getPatientName = (patientId: string) => {
+    const patient = patients.find((p) => p._id === patientId);
+    return patient
+      ? `${patient.firstName} ${patient.lastName}`
+      : `Patient ${patientId}`;
   };
 
   const getBedsForWard = (wardId: string) => {
@@ -151,6 +166,21 @@ export const WardManagement: React.FC = () => {
   const getBedStatusText = (status: BedStatus) => {
     return status.charAt(0).toUpperCase() + status.slice(1);
   };
+
+  const filteredPatients = patients.filter(
+    (patient) =>
+      patient.firstName
+        .toLowerCase()
+        .includes(patientSearchTerm.toLowerCase()) ||
+      patient.lastName
+        .toLowerCase()
+        .includes(patientSearchTerm.toLowerCase()) ||
+      patient.nationalId.toLowerCase().includes(patientSearchTerm.toLowerCase())
+  );
+
+  const availableBedsForTransfer = allBeds.filter(
+    (bed) => bed.status === BedStatus.AVAILABLE && bed._id !== selectedBed?._id
+  );
 
   // Patient View Component
   const PatientBedView = () => (
@@ -202,8 +232,10 @@ export const WardManagement: React.FC = () => {
                           </div>
                         </div>
                         <div className="text-right">
-                          <p className="text-sm text-gray-500">Patient ID</p>
-                          <p className="font-semibold">{user?._id}</p>
+                          <p className="text-sm text-gray-500">Patient</p>
+                          <p className="font-semibold">
+                            {user?.firstName} {user?.lastName}
+                          </p>
                         </div>
                       </div>
                     </CardContent>
@@ -366,19 +398,6 @@ export const WardManagement: React.FC = () => {
         })}
       </div>
 
-      {/* Add Ward Button for Admin */}
-      {user?.role === UserRole.ADMIN && (
-        <div className="flex justify-end">
-          <Button
-            className="bg-green-600 hover:bg-green-700"
-            onClick={() => setShowAddWardModal(true)}
-          >
-            <Plus className="w-4 h-4 mr-2" />
-            Add New Ward
-          </Button>
-        </div>
-      )}
-
       {/* Bed Management */}
       {selectedWard && (
         <Card>
@@ -453,7 +472,7 @@ export const WardManagement: React.FC = () => {
                         <div className="mt-2">
                           <div className="flex items-center justify-center text-xs text-gray-600">
                             <User className="w-3 h-3 mr-1" />
-                            Patient #{bed.patientId}
+                            {getPatientName(bed.patientId)}
                           </div>
                           <div className="flex justify-center space-x-1 mt-2">
                             <Button
@@ -462,10 +481,8 @@ export const WardManagement: React.FC = () => {
                               className="text-xs h-6"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                const newBedId = prompt("Enter new bed ID:");
-                                if (newBedId) {
-                                  handleTransferPatient(bed._id!, newBedId);
-                                }
+                                setSelectedBed(bed);
+                                setShowTransferModal(true);
                               }}
                             >
                               Transfer
@@ -499,19 +516,31 @@ export const WardManagement: React.FC = () => {
       {showAllocationModal && selectedBed && (
         <BedAllocationModal
           bed={selectedBed}
+          patients={filteredPatients}
+          patientSearchTerm={patientSearchTerm}
+          onPatientSearchChange={setPatientSearchTerm}
+          onSelectPatient={setSelectedPatient}
+          selectedPatient={selectedPatient}
           onAllocate={handleAllocateBed}
           onClose={() => {
             setShowAllocationModal(false);
             setSelectedBed(null);
+            setSelectedPatient(null);
+            setPatientSearchTerm("");
           }}
         />
       )}
 
-      {/* Add Ward Modal */}
-      {showAddWardModal && (
-        <AddWardModal
-          onClose={() => setShowAddWardModal(false)}
-          onCreate={handleCreateWard}
+      {/* Transfer Patient Modal */}
+      {showTransferModal && selectedBed && (
+        <TransferPatientModal
+          currentBed={selectedBed}
+          availableBeds={availableBedsForTransfer}
+          onTransfer={handleTransferPatient}
+          onClose={() => {
+            setShowTransferModal(false);
+            setSelectedBed(null);
+          }}
         />
       )}
     </>
@@ -533,12 +562,6 @@ export const WardManagement: React.FC = () => {
               : "Manage patient bed allocations and ward occupancy"}
           </p>
         </div>
-        {user?.role !== UserRole.PATIENT && user?.role !== UserRole.ADMIN && (
-          <Button className="bg-blue-600 hover:bg-blue-700">
-            <Bed className="w-4 h-4 mr-2" />
-            Add New Ward
-          </Button>
-        )}
       </div>
 
       {user?.role === UserRole.PATIENT ? <PatientBedView /> : <StaffWardView />}
@@ -549,17 +572,29 @@ export const WardManagement: React.FC = () => {
 // Bed Allocation Modal Component
 const BedAllocationModal: React.FC<{
   bed: IBed;
+  patients: IUser[];
+  patientSearchTerm: string;
+  onPatientSearchChange: (term: string) => void;
+  onSelectPatient: (patient: IUser) => void;
+  selectedPatient: IUser | null;
   onAllocate: (bedId: string, patientId: string) => void;
   onClose: () => void;
-}> = ({ bed, onAllocate, onClose }) => {
-  const [patientId, setPatientId] = useState("");
-
+}> = ({
+  bed,
+  patients,
+  patientSearchTerm,
+  onPatientSearchChange,
+  onSelectPatient,
+  selectedPatient,
+  onAllocate,
+  onClose,
+}) => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (patientId.trim()) {
-      onAllocate(bed._id!, patientId);
+    if (selectedPatient) {
+      onAllocate(bed._id!, selectedPatient._id!);
     } else {
-      alert("Please enter a patient ID");
+      alert("Please select a patient");
     }
   };
 
@@ -574,20 +609,64 @@ const BedAllocationModal: React.FC<{
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Patient ID *
+              Search Patient *
             </label>
             <input
               type="text"
-              value={patientId}
-              onChange={(e) => setPatientId(e.target.value)}
+              value={patientSearchTerm}
+              onChange={(e) => onPatientSearchChange(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="Enter patient ID (e.g., PAT001)"
-              required
+              placeholder="Enter patient name or ID..."
             />
-            <p className="text-xs text-gray-500 mt-1">
-              Try: PAT001, PAT002, or any patient ID
-            </p>
           </div>
+
+          {patientSearchTerm && (
+            <div className="border rounded-lg p-3 max-h-40 overflow-y-auto">
+              <h4 className="font-semibold mb-2">Select Patient:</h4>
+              <div className="space-y-2">
+                {patients.map((patient) => (
+                  <div
+                    key={patient._id}
+                    className={`flex items-center justify-between p-2 rounded cursor-pointer ${
+                      selectedPatient?._id === patient._id
+                        ? "bg-blue-50 border border-blue-200"
+                        : "hover:bg-gray-50"
+                    }`}
+                    onClick={() => onSelectPatient(patient)}
+                  >
+                    <div>
+                      <p className="font-medium">
+                        {patient.firstName} {patient.lastName}
+                      </p>
+                      <p className="text-sm text-gray-600">
+                        ID: {patient.nationalId} | {patient.phone}
+                      </p>
+                    </div>
+                    <Button size="sm" variant="outline">
+                      Select
+                    </Button>
+                  </div>
+                ))}
+                {patients.length === 0 && (
+                  <p className="text-sm text-gray-500 text-center py-2">
+                    No patients found
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {selectedPatient && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <h4 className="font-semibold text-green-800 mb-1">
+                Selected Patient:
+              </h4>
+              <p className="text-green-700">
+                {selectedPatient.firstName} {selectedPatient.lastName}
+                (ID: {selectedPatient.nationalId})
+              </p>
+            </div>
+          )}
 
           <div className="bg-gray-50 rounded-lg p-4">
             <h3 className="font-semibold mb-2">Bed Information</h3>
@@ -615,7 +694,9 @@ const BedAllocationModal: React.FC<{
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit">Allocate Bed</Button>
+            <Button type="submit" disabled={!selectedPatient}>
+              Allocate Bed
+            </Button>
           </div>
         </form>
       </div>
@@ -623,95 +704,94 @@ const BedAllocationModal: React.FC<{
   );
 };
 
-// Add Ward Modal Component
-const AddWardModal: React.FC<{
+// Transfer Patient Modal Component
+const TransferPatientModal: React.FC<{
+  currentBed: IBed;
+  availableBeds: IBed[];
+  onTransfer: (currentBedId: string, newBedId: string) => void;
   onClose: () => void;
-  onCreate: (wardData: any) => void;
-}> = ({ onClose, onCreate }) => {
-  const [wardData, setWardData] = useState({
-    name: "",
-    type: WardType.GENERAL,
-    capacity: 10,
-  });
+}> = ({ currentBed, availableBeds, onTransfer, onClose }) => {
+  const [selectedNewBed, setSelectedNewBed] = useState<IBed | null>(null);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    onCreate(wardData);
-  };
-
-  const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
-    setWardData((prev) => ({
-      ...prev,
-      [name]: name === "capacity" ? parseInt(value) : value,
-    }));
+    if (selectedNewBed) {
+      onTransfer(currentBed._id!, selectedNewBed._id!);
+    } else {
+      alert("Please select a new bed");
+    }
   };
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
       <div className="bg-white rounded-lg max-w-md w-full">
         <div className="p-6 border-b">
-          <h2 className="text-xl font-bold">Add New Ward</h2>
-          <p className="text-gray-600 mt-1">Create a new hospital ward</p>
+          <h2 className="text-xl font-bold">Transfer Patient</h2>
+          <p className="text-gray-600 mt-1">Move patient to a different bed</p>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Ward Name *
-            </label>
-            <input
-              type="text"
-              name="name"
-              value={wardData.name}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              placeholder="e.g., Emergency Ward A"
-              required
-            />
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+            <h4 className="font-semibold text-yellow-800 mb-1">Current Bed:</h4>
+            <p className="text-yellow-700">
+              Bed {currentBed.bedNumber} ({currentBed.bedType} Ward)
+            </p>
           </div>
 
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Ward Type *
+              Select New Bed *
             </label>
-            <select
-              name="type"
-              value={wardData.type}
-              onChange={handleChange}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              required
-            >
-              <option value={WardType.GENERAL}>General</option>
-              <option value={WardType.ICU}>ICU</option>
-              <option value={WardType.PRIVATE}>Private</option>
-              <option value={WardType.EMERGENCY}>Emergency</option>
-            </select>
+            <div className="border rounded-lg p-3 max-h-40 overflow-y-auto">
+              <div className="space-y-2">
+                {availableBeds.map((bed) => (
+                  <div
+                    key={bed._id}
+                    className={`flex items-center justify-between p-2 rounded cursor-pointer ${
+                      selectedNewBed?._id === bed._id
+                        ? "bg-blue-50 border border-blue-200"
+                        : "hover:bg-gray-50"
+                    }`}
+                    onClick={() => setSelectedNewBed(bed)}
+                  >
+                    <div>
+                      <p className="font-medium">Bed {bed.bedNumber}</p>
+                      <p className="text-sm text-gray-600">
+                        {bed.bedType} Ward
+                      </p>
+                    </div>
+                    <Button size="sm" variant="outline">
+                      Select
+                    </Button>
+                  </div>
+                ))}
+                {availableBeds.length === 0 && (
+                  <p className="text-sm text-gray-500 text-center py-2">
+                    No available beds found
+                  </p>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Capacity *
-            </label>
-            <input
-              type="number"
-              name="capacity"
-              value={wardData.capacity}
-              onChange={handleChange}
-              min="1"
-              max="100"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              required
-            />
-          </div>
+          {selectedNewBed && (
+            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
+              <h4 className="font-semibold text-green-800 mb-1">
+                Selected New Bed:
+              </h4>
+              <p className="text-green-700">
+                Bed {selectedNewBed.bedNumber} ({selectedNewBed.bedType} Ward)
+              </p>
+            </div>
+          )}
 
           <div className="flex justify-end space-x-3 pt-4">
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-            <Button type="submit">Create Ward</Button>
+            <Button type="submit" disabled={!selectedNewBed}>
+              Transfer Patient
+            </Button>
           </div>
         </form>
       </div>
