@@ -53,31 +53,37 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
     navigate("/login");
   };
 
-  // Redirect unauthorized users to their default page
+  // FIXED: Better role-based routing with proper default pages
   React.useEffect(() => {
     const currentPath = location.pathname;
 
     if (user) {
+      // Define default routes for each role
+      const defaultRoutes: { [key: string]: string } = {
+        patient: "/medical-records",
+        doctor: "/appointments",
+        nurse: "/wards",
+        ward_clerk: "/wards",
+        pharmacist: "/pharmacy",
+        admin: "/medical-records",
+      };
+
+      const userDefaultRoute = defaultRoutes[user.role] || "/medical-records";
+
       // If user tries to access a route they don't have access to, redirect them
       const navItem = navigation.find((item) => item.href === currentPath);
-      if (!navItem && currentPath !== "/medical-records") {
-        // Redirect to appropriate default page based on role
-        let defaultRoute = "/medical-records";
 
-        if (user.role === "nurse" || user.role === "ward_clerk") {
-          defaultRoute = "/wards";
-        } else if (user.role === "pharmacist") {
-          defaultRoute = "/pharmacy";
-        } else if (user.role === "patient") {
-          defaultRoute = "/medical-records";
-        } else if (user.role === "doctor") {
-          defaultRoute = "/appointments";
-        }
+      // If current path is not in their navigation and not their default route, redirect
+      if (!navItem && currentPath !== userDefaultRoute && currentPath !== "/") {
+        console.log(
+          `Redirecting ${user.role} from ${currentPath} to ${userDefaultRoute}`
+        );
+        navigate(userDefaultRoute);
+      }
 
-        // Only redirect if we're not already on the default route
-        if (currentPath !== defaultRoute) {
-          navigate(defaultRoute);
-        }
+      // If user goes to root path, redirect to their default route
+      if (currentPath === "/") {
+        navigate(userDefaultRoute);
       }
     }
   }, [user, location, navigate, navigation]);

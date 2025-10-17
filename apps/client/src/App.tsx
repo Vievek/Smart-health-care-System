@@ -33,6 +33,22 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
 const AppRoutes: React.FC = () => {
   const { user } = useAuth();
 
+  // FIXED: Role-based default routing
+  const getDefaultRoute = () => {
+    if (!user) return "/medical-records";
+
+    const defaultRoutes: { [key: string]: string } = {
+      patient: "/medical-records",
+      doctor: "/appointments",
+      nurse: "/wards",
+      ward_clerk: "/wards",
+      pharmacist: "/pharmacy",
+      admin: "/medical-records",
+    };
+
+    return defaultRoutes[user.role] || "/medical-records";
+  };
+
   return (
     <Layout>
       <Routes>
@@ -84,7 +100,7 @@ const AppRoutes: React.FC = () => {
             </ProtectedRoute>
           }
         />
-        <Route path="/" element={<Navigate to="/medical-records" />} />
+        <Route path="/" element={<Navigate to={getDefaultRoute()} />} />
       </Routes>
     </Layout>
   );
