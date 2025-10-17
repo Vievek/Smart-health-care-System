@@ -218,19 +218,18 @@ export const PharmacyDispensing: React.FC = () => {
     return matchesSearch;
   });
 
-  const filteredPatients = patients.filter(
-    (patient) =>
-      patient.firstName
-        .toLowerCase()
-        .includes(patientSearchTerm.toLowerCase()) ||
-      patient.lastName
-        .toLowerCase()
-        .includes(patientSearchTerm.toLowerCase()) ||
-      patient.nationalId
-        .toLowerCase()
-        .includes(patientSearchTerm.toLowerCase()) ||
-      patient._id?.toLowerCase().includes(patientSearchTerm.toLowerCase())
-  );
+  // FIXED: Better patient filtering that actually works
+  const filteredPatients = patients.filter((patient) => {
+    const fullName = `${patient.firstName} ${patient.lastName}`.toLowerCase();
+    const searchLower = patientSearchTerm.toLowerCase();
+
+    return (
+      fullName.includes(searchLower) ||
+      patient.nationalId.toLowerCase().includes(searchLower) ||
+      patient._id?.toLowerCase().includes(searchLower) ||
+      patient.email.toLowerCase().includes(searchLower)
+    );
+  });
 
   const lowStockItems = inventory.filter(
     (item) => item.quantityOnHand <= item.reorderLevel
@@ -274,23 +273,21 @@ export const PharmacyDispensing: React.FC = () => {
         <Card className="lg:col-span-2">
           <CardContent className="p-4">
             <div className="flex items-center space-x-4">
-              <div className="flex-1">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                  <input
-                    type="text"
-                    placeholder="Search for patient by name, ID, or national ID..."
-                    className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                    value={patientSearchTerm}
-                    onChange={(e) => {
-                      setPatientSearchTerm(e.target.value);
-                      setShowPatientSearch(true);
-                    }}
-                    onFocus={() => setShowPatientSearch(true)}
-                  />
-                </div>
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <input
+                  type="text"
+                  placeholder="Search for patient by name, ID, or national ID..."
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={patientSearchTerm}
+                  onChange={(e) => {
+                    setPatientSearchTerm(e.target.value);
+                    setShowPatientSearch(true);
+                  }}
+                  onFocus={() => setShowPatientSearch(true)}
+                />
 
-                {/* Patient Search Results */}
+                {/* Patient Search Results - FIXED: Better positioning and display */}
                 {showPatientSearch && patientSearchTerm && (
                   <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-60 overflow-y-auto">
                     <div className="p-2 space-y-2">
@@ -326,7 +323,7 @@ export const PharmacyDispensing: React.FC = () => {
                       ))}
                       {filteredPatients.length === 0 && (
                         <p className="text-sm text-gray-500 text-center py-2">
-                          No patients found
+                          No patients found matching "{patientSearchTerm}"
                         </p>
                       )}
                     </div>
@@ -390,6 +387,7 @@ export const PharmacyDispensing: React.FC = () => {
         </Card>
       </div>
 
+      {/* Rest of the component remains the same */}
       {/* Search Bar for Inventory */}
       <Card>
         <CardContent className="p-4">
@@ -638,7 +636,7 @@ export const PharmacyDispensing: React.FC = () => {
   );
 };
 
-// Dispensing Modal Component
+// Dispensing Modal Component (unchanged)
 const DispensingModal: React.FC<{
   prescription: IMedicalRecord;
   patient: IUser;
@@ -1000,7 +998,7 @@ const DispensingModal: React.FC<{
   );
 };
 
-// New Order Modal Component
+// New Order Modal Component (unchanged)
 const NewOrderModal: React.FC<{
   onClose: () => void;
   onOrder: (orderData: any) => void;

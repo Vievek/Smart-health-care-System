@@ -78,11 +78,11 @@ export class WardService implements IService<IWard> {
 
     const patientId = currentBed.patientId;
 
-    // Free current bed - use undefined instead of null
+    // Free current bed - use the existing update method with proper clearing
     await this.bedRepo.update(currentBedId, {
-      patientId: undefined,
+      $unset: { patientId: "" },
       status: BedStatus.AVAILABLE,
-    } as Partial<IBed>);
+    } as any);
 
     // Allocate new bed
     const updatedBed = await this.bedRepo.update(newBedId, {
@@ -111,10 +111,11 @@ export class WardService implements IService<IWard> {
       throw new Error("No patient assigned to this bed");
     }
 
+    // Use the existing update method with proper clearing
     const updatedBed = await this.bedRepo.update(bedId, {
-      patientId: undefined, // Use undefined instead of null
+      $unset: { patientId: "" },
       status: BedStatus.AVAILABLE,
-    } as Partial<IBed>);
+    } as any);
 
     if (updatedBed) {
       await this.updateWardOccupancy(updatedBed.wardId);

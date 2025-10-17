@@ -52,4 +52,17 @@ export class BedRepository extends BaseRepository<IBed> {
     );
     return result ? result.toObject() : null;
   }
+
+  // FIXED: Properly clear patient data when discharging
+  async clearPatientFromBed(bedId: string): Promise<IBed | null> {
+    const result = await this.model.findByIdAndUpdate(
+      bedId,
+      {
+        $unset: { patientId: "" },
+        status: BedStatus.AVAILABLE,
+      },
+      { new: true }
+    );
+    return result ? result.toObject() : null;
+  }
 }

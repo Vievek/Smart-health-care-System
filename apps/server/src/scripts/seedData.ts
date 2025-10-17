@@ -137,39 +137,38 @@ const seedData = async () => {
         name: "ICU - Intensive Care Unit",
         type: WardType.ICU,
         capacity: 10,
-        currentOccupancy: 2,
+        currentOccupancy: 0, // All beds available
       },
       {
         name: "General Ward A",
         type: WardType.GENERAL,
         capacity: 20,
-        currentOccupancy: 8,
+        currentOccupancy: 0, // All beds available
       },
       {
         name: "Private Ward B",
         type: WardType.PRIVATE,
         capacity: 15,
-        currentOccupancy: 5,
+        currentOccupancy: 0, // All beds available
       },
       {
         name: "Emergency Ward",
         type: WardType.EMERGENCY,
         capacity: 25,
-        currentOccupancy: 12,
+        currentOccupancy: 0, // All beds available
       },
     ]);
 
     console.log("Created wards:", wards.length);
 
-    // Create Beds - Use the actual generated ward IDs
+    // Create Beds - ALL BEDS ARE AVAILABLE (no patient assignments)
     const beds = await Bed.create([
       // ICU Beds (wards[0])
       {
         bedNumber: "ICU-01",
         wardId: wards[0]._id!.toString(),
         bedType: WardType.ICU,
-        status: BedStatus.OCCUPIED,
-        patientId: patients[0]._id!.toString(),
+        status: BedStatus.AVAILABLE,
         features: ["Ventilator", "Monitor", "Oxygen"],
       },
       {
@@ -190,7 +189,7 @@ const seedData = async () => {
         bedNumber: "ICU-04",
         wardId: wards[0]._id!.toString(),
         bedType: WardType.ICU,
-        status: BedStatus.MAINTENANCE,
+        status: BedStatus.AVAILABLE,
         features: ["Ventilator", "Monitor"],
       },
 
@@ -199,8 +198,7 @@ const seedData = async () => {
         bedNumber: "GW-01",
         wardId: wards[1]._id!.toString(),
         bedType: WardType.GENERAL,
-        status: BedStatus.OCCUPIED,
-        patientId: patients[1]._id!.toString(),
+        status: BedStatus.AVAILABLE,
         features: ["Side Table", "Curtain"],
       },
       {
@@ -228,7 +226,7 @@ const seedData = async () => {
         bedNumber: "GW-05",
         wardId: wards[1]._id!.toString(),
         bedType: WardType.GENERAL,
-        status: BedStatus.OCCUPIED,
+        status: BedStatus.AVAILABLE,
         features: ["Side Table"],
       },
 
@@ -251,7 +249,7 @@ const seedData = async () => {
         bedNumber: "PW-03",
         wardId: wards[2]._id!.toString(),
         bedType: WardType.PRIVATE,
-        status: BedStatus.OCCUPIED,
+        status: BedStatus.AVAILABLE,
         features: ["TV", "Private Bathroom", "Sofa", "WiFi", "Mini Fridge"],
       },
       {
@@ -267,14 +265,14 @@ const seedData = async () => {
         bedNumber: "ER-01",
         wardId: wards[3]._id!.toString(),
         bedType: WardType.EMERGENCY,
-        status: BedStatus.OCCUPIED,
+        status: BedStatus.AVAILABLE,
         features: ["Monitor", "Oxygen", "Emergency Kit"],
       },
       {
         bedNumber: "ER-02",
         wardId: wards[3]._id!.toString(),
         bedType: WardType.EMERGENCY,
-        status: BedStatus.OCCUPIED,
+        status: BedStatus.AVAILABLE,
         features: ["Monitor", "Oxygen"],
       },
       {
@@ -295,7 +293,7 @@ const seedData = async () => {
         bedNumber: "ER-05",
         wardId: wards[3]._id!.toString(),
         bedType: WardType.EMERGENCY,
-        status: BedStatus.MAINTENANCE,
+        status: BedStatus.AVAILABLE,
         features: ["Monitor"],
       },
     ]);
@@ -770,7 +768,7 @@ const seedData = async () => {
     console.log(
       "1. Medical Records: Both patients have multiple prescriptions and lab results"
     );
-    console.log("2. Ward Management: Multiple beds available for allocation");
+    console.log("2. Ward Management: ALL beds are available for allocation");
     console.log(
       "3. Pharmacy: All patients have active prescriptions for dispensing"
     );
