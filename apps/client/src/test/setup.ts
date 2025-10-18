@@ -1,6 +1,7 @@
 import { afterEach, vi } from "vitest";
 import { cleanup } from "@testing-library/react";
 import "@testing-library/jest-dom";
+import "./api-mocks"; // Import API mocks
 
 // Mock IntersectionObserver with proper implementation
 class MockIntersectionObserver {
@@ -27,6 +28,7 @@ global.ResizeObserver = MockResizeObserver as any;
 // Cleanup after each test
 afterEach(() => {
   cleanup();
+  vi.clearAllMocks();
 });
 
 // Mock localStorage
@@ -54,3 +56,15 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: vi.fn(),
   })),
 });
+
+// Mock console.error to reduce noise
+const originalError = console.error;
+console.error = (...args: any[]) => {
+  if (
+    typeof args[0] === "string" &&
+    args[0].includes("ReactDOM.render is no longer supported")
+  ) {
+    return;
+  }
+  originalError.call(console, ...args);
+};

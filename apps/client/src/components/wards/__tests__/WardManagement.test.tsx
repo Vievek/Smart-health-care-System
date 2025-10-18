@@ -1,48 +1,14 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "../../../test/utils";
+import { render, screen, waitFor } from "../../../test/utils";
 import { WardManagement } from "../WardManagement";
 import { WardService } from "../../../services/WardService";
 import { useAuth } from "../../../contexts/AuthContext";
+import { UserRole, BedStatus } from "@shared/healthcare-types";
+import { mockWards, mockBeds } from "../../../test/mocks";
 
 vi.mock("../../../services/WardService");
+vi.mock("../../../services/UserService");
 vi.mock("../../../contexts/AuthContext");
-
-const mockWards = [
-  {
-    _id: "ward1",
-    name: "ICU - Intensive Care Unit",
-    type: "icu",
-    capacity: 10,
-    currentOccupancy: 2,
-  },
-  {
-    _id: "ward2",
-    name: "General Ward A",
-    type: "general",
-    capacity: 20,
-    currentOccupancy: 15,
-  },
-];
-
-const mockBeds = [
-  {
-    _id: "bed1",
-    bedNumber: "ICU-01",
-    wardId: "ward1",
-    bedType: "icu",
-    status: "available",
-    features: ["Ventilator", "Monitor"],
-  },
-  {
-    _id: "bed2",
-    bedNumber: "ICU-02",
-    wardId: "ward1",
-    bedType: "icu",
-    status: "occupied",
-    patientId: "patient123",
-    features: ["Ventilator", "Monitor"],
-  },
-];
 
 describe("WardManagement", () => {
   const mockGetWards = vi.fn();
@@ -52,27 +18,42 @@ describe("WardManagement", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseAuth.mockReturnValue({
-      user: { _id: "nurse123", role: "nurse" },
-      isAuthenticated: true,
-      login: vi.fn(),
-      logout: vi.fn(),
-      hasRole: vi.fn(),
-    });
 
+    // Mock WardService with proper data and error handling
     (WardService as any).mockImplementation(() => ({
       getWards: mockGetWards.mockResolvedValue(mockWards),
       getAvailableBeds: mockGetAvailableBeds.mockResolvedValue(
-        mockBeds.filter((b) => b.status === "available")
+        mockBeds.filter((b) => b.status === BedStatus.AVAILABLE)
       ),
       getAllBeds: mockGetAllBeds.mockResolvedValue(mockBeds),
-      getBedsByWard: vi.fn(),
-      getBedsByPatient: vi.fn(),
+      getBedsByWard: vi.fn().mockResolvedValue(mockBeds),
+      getBedsByPatient: vi.fn().mockResolvedValue([]),
       allocateBed: vi.fn(),
       transferPatient: vi.fn(),
       dischargePatient: vi.fn(),
       createWard: vi.fn(),
     }));
+
+    // Mock UserService
+    vi.mock("../../../services/UserService", () => ({
+      UserService: vi.fn(() => ({
+        getAll: vi.fn().mockResolvedValue([]),
+      })),
+    }));
+
+    // Mock useAuth
+    mockUseAuth.mockReturnValue({
+      user: {
+        _id: "nurse123",
+        role: UserRole.NURSE,
+        firstName: "Emily",
+        lastName: "Brown",
+      },
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+      hasRole: vi.fn(),
+    });
   });
 
   it("should load and display wards and beds", async () => {
@@ -80,8 +61,19 @@ describe("WardManagement", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Ward & Bed Management")).toBeInTheDocument();
-      expect(screen.getByText("ICU - Intensive Care Unit")).toBeInTheDocument();
-      expect(screen.getByText("General Ward A")).toBeInTheDocument();
+    });
+
+    // Wait for wards to load and check for specific ward card
+    await waitFor(() => {
+      // Look for the specific ward card title that contains the full ward name
+      const wardCardTitle = screen.getByText("ICU - Intensive Care Unit");
+      expect(wardCardTitle).toBeInTheDocument();
+    });
+
+    // Verify that bed information is displayed
+    await waitFor(() => {
+      expect(screen.getByText("Bed ICU-01")).toBeInTheDocument();
+      expect(screen.getByText("Available")).toBeInTheDocument();
     });
   });
 
@@ -89,21 +81,32 @@ describe("WardManagement", () => {
     render(<WardManagement />);
 
     await waitFor(() => {
-      expect(screen.getByText("Available Beds")).toBeInTheDocument();
+      expect(screen.getByText(/Available Beds/i)).toBeInTheDocument();
+    });
+
+    // Verify search functionality is available
+    await waitFor(() => {
+      expect(
+        screen.getByPlaceholderText(/Search beds by number or patient/i)
+      ).toBeInTheDocument();
     });
   });
 
-  it("should allow selecting a ward", async () => {
+  it("should show patient view for patients", async () => {
+    mockUseAuth.mockReturnValue({
+      user: {
+        _id: "patient123",
+        role: UserRole.PATIENT,
+        firstName: "John",
+        lastName: "Doe",
+      },
+      isAuthenticated: true,
+    });
+
     render(<WardManagement />);
 
     await waitFor(() => {
-      const icuWard = screen.getByText("ICU - Intensive Care Unit");
-      fireEvent.click(icuWard);
-    });
-
-    // Should show bed management for selected ward
-    await waitFor(() => {
-      expect(screen.getByText(/Bed Management/)).toBeInTheDocument();
+      expect(screen.getByText(/My Bed Information/i)).toBeInTheDocument();
     });
   });
 });

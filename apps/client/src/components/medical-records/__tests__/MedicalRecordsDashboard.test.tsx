@@ -4,37 +4,19 @@ import { MedicalRecordsDashboard } from "../MedicalRecordsDashboard";
 import { MedicalRecordService } from "../../../services/MedicalRecordService";
 import { useAuth } from "../../../contexts/AuthContext";
 import { UserRole } from "@shared/healthcare-types";
+import { mockMedicalRecords } from "../../../test/mocks";
 
-// Mock services and hooks
 vi.mock("../../../services/MedicalRecordService");
 vi.mock("../../../contexts/AuthContext");
 
-const mockMedicalRecords = [
-  {
-    _id: "record1",
-    patientId: "user123",
-    recordType: "lab",
-    title: "Blood Test Results",
-    description: "Complete blood count test",
-    createdDate: new Date("2024-01-15"),
-    authorId: "doc123",
-  },
-];
-
 describe("MedicalRecordsDashboard", () => {
   const mockGetRecords = vi.fn();
+  const mockUseAuth = useAuth as any;
 
   beforeEach(() => {
     vi.clearAllMocks();
 
-    (useAuth as any).mockReturnValue({
-      user: { _id: "user123", role: UserRole.PATIENT },
-      isAuthenticated: true,
-      login: vi.fn(),
-      logout: vi.fn(),
-      hasRole: vi.fn(),
-    });
-
+    // Mock MedicalRecordService
     (MedicalRecordService as any).mockImplementation(() => ({
       getRecords: mockGetRecords.mockResolvedValue(mockMedicalRecords),
       getRecordById: vi.fn(),
@@ -42,6 +24,20 @@ describe("MedicalRecordsDashboard", () => {
       createPrescription: vi.fn(),
       getPrescriptionsByPatient: vi.fn(),
     }));
+
+    // Mock useAuth
+    mockUseAuth.mockReturnValue({
+      user: {
+        _id: "user123",
+        role: UserRole.PATIENT,
+        firstName: "John",
+        lastName: "Doe",
+      },
+      isAuthenticated: true,
+      login: vi.fn(),
+      logout: vi.fn(),
+      hasRole: vi.fn(),
+    });
   });
 
   it("should load and display medical records", async () => {
@@ -49,7 +45,29 @@ describe("MedicalRecordsDashboard", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Medical Records")).toBeInTheDocument();
-      expect(screen.getByText("Blood Test Results")).toBeInTheDocument();
+    });
+
+    expect(screen.getByText("Blood Test Results")).toBeInTheDocument();
+  });
+
+  it("should show patient search for doctors", async () => {
+    mockUseAuth.mockReturnValue({
+      user: {
+        _id: "doc123",
+        role: UserRole.DOCTOR,
+        firstName: "Jane",
+        lastName: "Smith",
+      },
+      isAuthenticated: true,
+    });
+
+    render(<MedicalRecordsDashboard userRole={UserRole.DOCTOR} />);
+
+    await waitFor(() => {
+      const searchButton = screen.getByRole("button", {
+        name: /search patients/i,
+      });
+      expect(searchButton).toBeInTheDocument();
     });
   });
 });
