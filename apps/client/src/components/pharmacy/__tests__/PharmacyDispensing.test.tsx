@@ -32,38 +32,9 @@ const mockInventory = [
   },
 ];
 
-const mockPrescriptions = [
-  {
-    _id: "rx1",
-    patientId: "patient123",
-    recordType: "prescription",
-    title: "Antibiotic Course",
-    description: "7-day antibiotic course",
-    createdDate: new Date("2024-01-15"),
-    authorId: "doc123",
-    prescription: {
-      medications: [
-        {
-          medicationId: "inv1",
-          name: "Amoxicillin 500mg",
-          dosage: "1 tablet",
-          frequency: "3 times daily",
-          duration: "7 days",
-          instructions: "Take with food",
-        },
-      ],
-      instructions: "Complete full course",
-      issuedDate: new Date("2024-01-15"),
-      expiryDate: new Date("2024-02-15"),
-      status: "active",
-    },
-  },
-];
-
 describe("PharmacyDispensing", () => {
   const mockGetInventory = vi.fn();
-  const mockGetPrescriptionsByPatient = vi.fn();
-  const mockUseAuth = useAuth as vi.MockedFunction<typeof useAuth>;
+  const mockUseAuth = useAuth as any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -75,9 +46,7 @@ describe("PharmacyDispensing", () => {
       hasRole: vi.fn(),
     });
 
-    (
-      PharmacyService as vi.MockedClass<typeof PharmacyService>
-    ).mockImplementation(() => ({
+    (PharmacyService as any).mockImplementation(() => ({
       getInventory: mockGetInventory.mockResolvedValue(mockInventory),
       getLowStockItems: vi.fn(),
       dispenseMedication: vi.fn(),

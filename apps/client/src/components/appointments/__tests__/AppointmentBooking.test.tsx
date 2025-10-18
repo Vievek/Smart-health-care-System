@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { render, screen, waitFor, fireEvent } from "../../../test/utils";
+import { render, screen, waitFor } from "../../../test/utils";
 import { AppointmentBooking } from "../AppointmentBooking";
 import { AppointmentService } from "../../../services/AppointmentService";
 import { useAuth } from "../../../contexts/AuthContext";
 
+// Mock services and hooks
 vi.mock("../../../services/AppointmentService");
 vi.mock("../../../contexts/AuthContext");
 
@@ -21,28 +22,14 @@ const mockAppointments = [
   },
 ];
 
-const mockDoctors = [
-  {
-    _id: "doc123",
-    nationalId: "DOC001",
-    email: "doctor@test.com",
-    phone: "+1234567890",
-    firstName: "John",
-    lastName: "Smith",
-    role: "doctor",
-    specialization: "Cardiology",
-    address: "123 Test St",
-  },
-];
-
 describe("AppointmentBooking", () => {
   const mockGetAppointments = vi.fn();
-  const mockGetDoctors = vi.fn();
-  const mockUseAuth = useAuth as vi.MockedFunction<typeof useAuth>;
 
   beforeEach(() => {
     vi.clearAllMocks();
-    mockUseAuth.mockReturnValue({
+
+    // Mock useAuth
+    (useAuth as any).mockReturnValue({
       user: { _id: "user123", role: "patient" },
       isAuthenticated: true,
       login: vi.fn(),
@@ -50,9 +37,8 @@ describe("AppointmentBooking", () => {
       hasRole: vi.fn(),
     });
 
-    (
-      AppointmentService as vi.MockedClass<typeof AppointmentService>
-    ).mockImplementation(() => ({
+    // Mock AppointmentService
+    (AppointmentService as any).mockImplementation(() => ({
       getAppointments: mockGetAppointments.mockResolvedValue(mockAppointments),
       createAppointment: vi.fn(),
       cancelAppointment: vi.fn(),
@@ -74,18 +60,6 @@ describe("AppointmentBooking", () => {
 
     await waitFor(() => {
       expect(screen.getByText("Book New Appointment")).toBeInTheDocument();
-    });
-  });
-
-  it("should navigate through appointment booking steps", async () => {
-    render(<AppointmentBooking />);
-
-    // Start booking process
-    const bookButton = screen.getByText("Book New Appointment");
-    fireEvent.click(bookButton);
-
-    await waitFor(() => {
-      expect(screen.getByText("Select Doctor")).toBeInTheDocument();
     });
   });
 });

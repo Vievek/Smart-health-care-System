@@ -1,5 +1,5 @@
-module.exports = {
-  preset: "ts-jest",
+export default {
+  preset: "ts-jest/presets/default-esm",
   testEnvironment: "node",
   roots: ["<rootDir>/src"],
   testMatch: [
@@ -7,7 +7,12 @@ module.exports = {
     "**/?(*.)+(spec|test).+(ts|tsx|js)",
   ],
   transform: {
-    "^.+\\.(ts|tsx)$": "ts-jest",
+    "^.+\\.(ts|tsx)$": [
+      "ts-jest",
+      {
+        useESM: true,
+      },
+    ],
   },
   collectCoverageFrom: [
     "src/**/*.{ts,tsx}",
@@ -16,7 +21,9 @@ module.exports = {
     "!src/scripts/**",
   ],
   setupFilesAfterEnv: ["<rootDir>/src/test/setup.ts"],
-  moduleNameMapping: {
-    "@shared/(.*)": "<rootDir>/../../packages/shared/src/$1",
+  moduleNameMapper: {
+    "^@shared/healthcare-types$":
+      "<rootDir>/src/__mocks__/@shared/healthcare-types.ts",
   },
+  extensionsToTreatAsEsm: [".ts"],
 };

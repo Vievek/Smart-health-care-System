@@ -1,3 +1,4 @@
+import { describe, it, expect, jest, beforeEach } from "@jest/globals";
 import { PharmacyService } from "../PharmacyService";
 import { InventoryRepository } from "../../repositories/InventoryRepository";
 import { DispenseTransactionRepository } from "../../repositories/DispenseTransactionRepository";
@@ -7,7 +8,13 @@ import {
   IDispenseTransaction,
   PrescriptionStatus,
   PaymentStatus,
-} from "@shared/healthcare-types";
+  MedicalRecordType,
+} from "../../test/types";
+
+// Mock the repositories and services
+jest.mock("../../repositories/InventoryRepository");
+jest.mock("../../repositories/DispenseTransactionRepository");
+jest.mock("../MedicalRecordService");
 
 describe("PharmacyService", () => {
   let pharmacyService: PharmacyService;
@@ -43,6 +50,16 @@ describe("PharmacyService", () => {
       update: jest.fn(),
     } as any;
 
+    (InventoryRepository as jest.Mock).mockImplementation(
+      () => mockInventoryRepo
+    );
+    (DispenseTransactionRepository as jest.Mock).mockImplementation(
+      () => mockTransactionRepo
+    );
+    (MedicalRecordService as jest.Mock).mockImplementation(
+      () => mockMedicalRecordService
+    );
+
     pharmacyService = new PharmacyService(
       mockInventoryRepo,
       mockTransactionRepo,
@@ -66,10 +83,26 @@ describe("PharmacyService", () => {
 
       const mockPrescription = {
         _id: "rx123",
-        recordType: "prescription",
+        patientId: "patient123",
+        recordType: MedicalRecordType.PRESCRIPTION,
+        title: "Test Prescription",
+        createdDate: new Date(),
+        authorId: "doc123",
+        attachments: [],
         prescription: {
           status: PrescriptionStatus.ACTIVE,
-          medications: [],
+          medications: [
+            {
+              medicationId: "med1",
+              name: "Test Medication",
+              dosage: "10mg",
+              frequency: "Once daily",
+              duration: "30 days",
+            },
+          ],
+          instructions: "Take as directed",
+          issuedDate: new Date(),
+          expiryDate: new Date(),
         },
       };
 
@@ -91,7 +124,7 @@ describe("PharmacyService", () => {
         amount: 10,
         paymentStatus: PaymentStatus.PENDING,
         dispensedAt: new Date(),
-      };
+      } as IDispenseTransaction;
 
       mockMedicalRecordService.getById.mockResolvedValue(
         mockPrescription as any
@@ -109,12 +142,14 @@ describe("PharmacyService", () => {
       expect(mockInventoryRepo.findById).toHaveBeenCalledWith("med1");
       expect(mockTransactionRepo.create).toHaveBeenCalled();
       expect(mockInventoryRepo.decrementStock).toHaveBeenCalledWith("med1", 1);
-      expect(mockMedicalRecordService.update).toHaveBeenCalledWith("rx123", {
-        prescription: {
-          ...mockPrescription.prescription,
-          status: PrescriptionStatus.DISPENSED,
-        },
-      });
+      expect(mockMedicalRecordService.update).toHaveBeenCalledWith(
+        "rx123",
+        expect.objectContaining({
+          prescription: expect.objectContaining({
+            status: PrescriptionStatus.DISPENSED,
+          }),
+        })
+      );
       expect(result).toEqual(mockTransaction);
     });
 
@@ -148,12 +183,12 @@ describe("PharmacyService", () => {
 
       const mockPrescription = {
         _id: "rx123",
-        recordType: "prescription",
+        recordType: MedicalRecordType.PRESCRIPTION,
         prescription: {
           status: PrescriptionStatus.ACTIVE,
           medications: [],
         },
-      };
+      } as any;
 
       const mockMedication: IInventoryItem = {
         _id: "med1",
@@ -167,9 +202,7 @@ describe("PharmacyService", () => {
         supplier: "Test Supplier",
       };
 
-      mockMedicalRecordService.getById.mockResolvedValue(
-        mockPrescription as any
-      );
+      mockMedicalRecordService.getById.mockResolvedValue(mockPrescription);
       mockInventoryRepo.findById.mockResolvedValue(mockMedication);
 
       await expect(

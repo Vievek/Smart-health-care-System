@@ -48,7 +48,7 @@ describe("WardManagement", () => {
   const mockGetWards = vi.fn();
   const mockGetAllBeds = vi.fn();
   const mockGetAvailableBeds = vi.fn();
-  const mockUseAuth = useAuth as vi.MockedFunction<typeof useAuth>;
+  const mockUseAuth = useAuth as any;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -60,21 +60,19 @@ describe("WardManagement", () => {
       hasRole: vi.fn(),
     });
 
-    (WardService as vi.MockedClass<typeof WardService>).mockImplementation(
-      () => ({
-        getWards: mockGetWards.mockResolvedValue(mockWards),
-        getAvailableBeds: mockGetAvailableBeds.mockResolvedValue(
-          mockBeds.filter((b) => b.status === "available")
-        ),
-        getAllBeds: mockGetAllBeds.mockResolvedValue(mockBeds),
-        getBedsByWard: vi.fn(),
-        getBedsByPatient: vi.fn(),
-        allocateBed: vi.fn(),
-        transferPatient: vi.fn(),
-        dischargePatient: vi.fn(),
-        createWard: vi.fn(),
-      })
-    );
+    (WardService as any).mockImplementation(() => ({
+      getWards: mockGetWards.mockResolvedValue(mockWards),
+      getAvailableBeds: mockGetAvailableBeds.mockResolvedValue(
+        mockBeds.filter((b) => b.status === "available")
+      ),
+      getAllBeds: mockGetAllBeds.mockResolvedValue(mockBeds),
+      getBedsByWard: vi.fn(),
+      getBedsByPatient: vi.fn(),
+      allocateBed: vi.fn(),
+      transferPatient: vi.fn(),
+      dischargePatient: vi.fn(),
+      createWard: vi.fn(),
+    }));
   });
 
   it("should load and display wards and beds", async () => {
