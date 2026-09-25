@@ -2,7 +2,7 @@
   "name": "healthcare-server",
   "type": "module",
   "scripts": {
-    "dev": "nodemon --exec \"node --loader ts-node/esm\" src/index.ts",
+    "dev": "nodemon --exec \"tsx\" src/index.ts",
     "build": "tsc",
     "start": "node dist/index.js",
     "build:dev": "npm run build && npm run seed",
@@ -45,6 +45,7 @@
     "supertest": "^7.1.4",
     "ts-jest": "^29.4.5",
     "ts-node": "^10.9.2",
+    "tsx": "^4.23.15",
     "typescript": "^5.1.6"
   }
 }
