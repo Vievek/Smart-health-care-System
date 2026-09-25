@@ -56,14 +56,13 @@ router.post("/register", async (req, res) => {
       lastName,
       password,
       address,
-      role = UserRole.PATIENT, // Default to patient
       dateOfBirth,
       gender,
       emergencyContact,
       insuranceInfo,
-      specialization,
-      licenseNumber,
     } = req.body;
+
+    const role = UserRole.PATIENT; // Force patient role for public registration
 
     console.log("Registration request:", { nationalId, email, role });
 
@@ -126,15 +125,6 @@ router.post("/register", async (req, res) => {
       userData.gender = gender;
       userData.emergencyContact = emergencyContact;
       userData.insuranceInfo = insuranceInfo || "";
-    } else if (role === UserRole.DOCTOR) {
-      if (!specialization || !licenseNumber) {
-        return res.status(400).json({
-          error:
-            "Doctor registration requires specialization and licenseNumber",
-        });
-      }
-      userData.specialization = specialization;
-      userData.licenseNumber = licenseNumber;
     }
 
     console.log("Creating user with data:", {
@@ -169,8 +159,6 @@ router.post("/register", async (req, res) => {
     if (role === UserRole.PATIENT) {
       userResponse.dateOfBirth = (user as any).dateOfBirth;
       userResponse.gender = (user as any).gender;
-    } else if (role === UserRole.DOCTOR) {
-      userResponse.specialization = (user as any).specialization;
     }
 
     res.status(201).json({

@@ -13,6 +13,7 @@ import { MedicalRecordsDashboard } from "./components/medical-records/MedicalRec
 import { AppointmentBooking } from "./components/appointments/AppointmentBooking";
 import { WardManagement } from "./components/wards/WardManagement";
 import { PharmacyDispensing } from "./components/pharmacy/PharmacyDispensing";
+import { StaffManagement } from "./components/admin/StaffManagement";
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -97,6 +98,14 @@ const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute>
               <PharmacyDispensing />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/staff-management"
+          element={
+            <ProtectedRoute>
+              <StaffManagement />
             </ProtectedRoute>
           }
         />

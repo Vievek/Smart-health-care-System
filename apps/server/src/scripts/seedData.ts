@@ -131,6 +131,22 @@ const seedData = async () => {
 
     console.log("Created pharmacists:", pharmacists.length);
 
+    const admins = await User.create([
+      {
+        nationalId: "ADM001",
+        email: "admin@hospital.com",
+        phone: "+1234567898",
+        firstName: "System",
+        lastName: "Admin",
+        role: UserRole.ADMIN,
+        passwordHash: await bcrypt.hash("admin123", 12),
+        address: "Hospital Admin Block, City",
+        permissions: ["ALL"],
+      },
+    ]);
+
+    console.log("Created admins:", admins.length);
+
     // Create Wards
     const wards = await Ward.create([
       {
@@ -703,6 +719,7 @@ const seedData = async () => {
 
     console.log(`\nNurses: ${nurses.length}`);
     console.log(`Pharmacists: ${pharmacists.length}`);
+    console.log(`Admins: ${admins.length}`);
 
     console.log(`\nWards: ${wards.length}`);
     wards.forEach((w) =>
@@ -762,6 +779,9 @@ const seedData = async () => {
     );
     console.log(
       "PHARMACIST: National ID: PHA001, Password: password123 (Michael Wilson)"
+    );
+    console.log(
+      "ADMIN: National ID: ADM001, Password: admin123 (System Admin)"
     );
 
     console.log("\n=== KEY FEATURES TO TEST ===");
