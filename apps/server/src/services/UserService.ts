@@ -19,16 +19,10 @@ export class UserService implements IService<IUser> {
   }
 
   async create(data: Partial<IUser>): Promise<IUser> {
-    if (data.passwordHash) {
-      data.passwordHash = await bcrypt.hash(data.passwordHash, 12);
-    }
     return this.userRepository.create(data);
   }
 
   async update(id: string, data: Partial<IUser>): Promise<IUser | null> {
-    if (data.passwordHash) {
-      data.passwordHash = await bcrypt.hash(data.passwordHash, 12);
-    }
     return this.userRepository.update(id, data);
   }
 

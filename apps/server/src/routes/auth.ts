@@ -50,14 +50,13 @@ router.post('/register', async (req, res) => {
       lastName,
       password,
       address,
-      role = UserRole.PATIENT, // Default to patient
       dateOfBirth,
       gender,
       emergencyContact,
       insuranceInfo,
-      specialization,
-      licenseNumber,
-    } = req.body
+    } = req.body;
+
+    const role = UserRole.PATIENT; // Force patient role for public registration
 
     console.log('Registration request received (PII redacted)')
 
@@ -102,18 +101,10 @@ router.post('/register', async (req, res) => {
           error: 'Patient registration requires dateOfBirth, gender, and emergencyContact',
         })
       }
-      userData.dateOfBirth = new Date(dateOfBirth)
-      userData.gender = gender
-      userData.emergencyContact = emergencyContact
-      userData.insuranceInfo = insuranceInfo || ''
-    } else if (role === UserRole.DOCTOR) {
-      if (!specialization || !licenseNumber) {
-        return res.status(400).json({
-          error: 'Doctor registration requires specialization and licenseNumber',
-        })
-      }
-      userData.specialization = specialization
-      userData.licenseNumber = licenseNumber
+      userData.dateOfBirth = new Date(dateOfBirth);
+      userData.gender = gender;
+      userData.emergencyContact = emergencyContact;
+      userData.insuranceInfo = insuranceInfo || "";
     }
 
     console.log('Creating user (data redacted)')
@@ -139,10 +130,8 @@ router.post('/register', async (req, res) => {
 
     // Add role-specific fields to response
     if (role === UserRole.PATIENT) {
-      userResponse.dateOfBirth = (user as any).dateOfBirth
-      userResponse.gender = (user as any).gender
-    } else if (role === UserRole.DOCTOR) {
-      userResponse.specialization = (user as any).specialization
+      userResponse.dateOfBirth = (user as any).dateOfBirth;
+      userResponse.gender = (user as any).gender;
     }
 
     res.status(201).json({
