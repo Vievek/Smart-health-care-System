@@ -1,217 +1,146 @@
-import { Response } from "express";
-import { MedicalRecordService } from "../services/MedicalRecordService";
-import { AuditService } from "../services/AuditService";
-import { AuthRequest } from "../middleware/auth";
+import { Response } from 'express'
+import { MedicalRecordService } from '../services/MedicalRecordService'
+import { AuditService } from '../services/AuditService'
+import { AuthRequest } from '../middleware/auth'
 
 export class MedicalRecordController {
-  private medicalRecordService: MedicalRecordService;
-  private auditService: AuditService;
+  private medicalRecordService: MedicalRecordService
+  private auditService: AuditService
 
   constructor() {
-    this.medicalRecordService = new MedicalRecordService();
-    this.auditService = new AuditService();
+    this.medicalRecordService = new MedicalRecordService()
+    this.auditService = new AuditService()
   }
 
   getRecords = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const { patientId } = req.query;
-      const user = req.user!;
+      const { patientId } = req.query
+      const user = req.user!
 
-      console.log(
-        "Getting records for user:",
-        user._id,
-        "role:",
-        user.role,
-        "patientId:",
-        patientId
-      );
+      console.log('Getting records for user (redacted)')
 
-      let records;
-      if (user.role === "patient") {
-        records = await this.medicalRecordService.getPatientRecords(
-          user._id!.toString(),
-          user.role
-        );
+      let records
+      if (user.role === 'patient') {
+        records = await this.medicalRecordService.getPatientRecords(user._id!.toString(), user.role)
       } else if (patientId) {
         // For doctors/pharmacists searching for specific patient
-        records = await this.medicalRecordService.getPatientRecords(
-          patientId as string,
-          user.role
-        );
+        records = await this.medicalRecordService.getPatientRecords(patientId as string, user.role)
       } else {
-        records = await this.medicalRecordService.getAll(req.query);
+        records = await this.medicalRecordService.getAll(req.query)
       }
 
-      console.log("Found records:", records.length);
+      console.log('Found records:', records.length)
 
-      await this.auditService.logAccess(
-        user._id!.toString(),
-        "medical_records",
-        "view_list",
-        req.ip!,
-        "success"
-      );
+      await this.auditService.logAccess(user._id!.toString(), 'medical_records', 'view_list', req.ip!, 'success')
 
-      res.json(records);
+      res.json(records)
     } catch (error) {
-      console.error("Error in getRecords:", error);
-      await this.auditService.logAccess(
-        req.user!._id!.toString(),
-        "medical_records",
-        "view_list",
-        req.ip!,
-        "failure",
-        { error: (error as Error).message }
-      );
-      res.status(500).json({ error: "Failed to fetch medical records" });
+      console.error('Error in getRecords:', error)
+      await this.auditService.logAccess(req.user!._id!.toString(), 'medical_records', 'view_list', req.ip!, 'failure', {
+        error: (error as Error).message,
+      })
+      res.status(500).json({ error: 'Failed to fetch medical records' })
     }
-  };
+  }
 
   getRecordById = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const record = await this.medicalRecordService.getById(req.params.id);
+      const record = await this.medicalRecordService.getById(req.params.id)
 
       if (!record) {
-        res.status(404).json({ error: "Record not found" });
-        return;
+        res.status(404).json({ error: 'Record not found' })
+        return
       }
 
-      await this.auditService.logAccess(
-        req.user!._id!.toString(),
-        "medical_record",
-        "view",
-        req.ip!,
-        "success",
-        { recordId: req.params.id }
-      );
+      await this.auditService.logAccess(req.user!._id!.toString(), 'medical_record', 'view', req.ip!, 'success', {
+        recordId: req.params.id,
+      })
 
-      res.json(record);
+      res.json(record)
     } catch (error) {
-      await this.auditService.logAccess(
-        req.user!._id!.toString(),
-        "medical_record",
-        "view",
-        req.ip!,
-        "failure",
-        { error: (error as Error).message }
-      );
-      res.status(500).json({ error: "Failed to fetch medical record" });
+      await this.auditService.logAccess(req.user!._id!.toString(), 'medical_record', 'view', req.ip!, 'failure', {
+        error: (error as Error).message,
+      })
+      res.status(500).json({ error: 'Failed to fetch medical record' })
     }
-  };
+  }
 
-  downloadRecordPDF = async (
-    req: AuthRequest,
-    res: Response
-  ): Promise<void> => {
+  downloadRecordPDF = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const pdfBuffer = await this.medicalRecordService.generateRecordPDF(
-        req.params.id
-      );
+      const pdfBuffer = await this.medicalRecordService.generateRecordPDF(req.params.id)
 
       await this.auditService.logAccess(
         req.user!._id!.toString(),
-        "medical_record",
-        "download_pdf",
+        'medical_record',
+        'download_pdf',
         req.ip!,
-        "success",
+        'success',
         { recordId: req.params.id }
-      );
+      )
 
-      res.setHeader("Content-Type", "application/pdf");
-      res.setHeader(
-        "Content-Disposition",
-        `attachment; filename=record-${req.params.id}.pdf`
-      );
-      res.send(pdfBuffer);
+      res.setHeader('Content-Type', 'application/pdf')
+      res.setHeader('Content-Disposition', `attachment; filename=record-${req.params.id}.pdf`)
+      res.send(pdfBuffer)
     } catch (error) {
       await this.auditService.logAccess(
         req.user!._id!.toString(),
-        "medical_record",
-        "download_pdf",
+        'medical_record',
+        'download_pdf',
         req.ip!,
-        "failure",
+        'failure',
         { error: (error as Error).message }
-      );
-      res.status(500).json({ error: "Failed to generate PDF" });
+      )
+      res.status(500).json({ error: 'Failed to generate PDF' })
     }
-  };
+  }
 
-  createPrescription = async (
-    req: AuthRequest,
-    res: Response
-  ): Promise<void> => {
+  createPrescription = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const prescription = await this.medicalRecordService.createPrescription({
         ...req.body,
         authorId: req.user!._id,
-      });
+      })
 
-      await this.auditService.logAccess(
-        req.user!._id!.toString(),
-        "prescription",
-        "create",
-        req.ip!,
-        "success",
-        { prescriptionId: prescription._id }
-      );
+      await this.auditService.logAccess(req.user!._id!.toString(), 'prescription', 'create', req.ip!, 'success', {
+        prescriptionId: prescription._id,
+      })
 
-      res.status(201).json(prescription);
+      res.status(201).json(prescription)
     } catch (error) {
-      await this.auditService.logAccess(
-        req.user!._id!.toString(),
-        "prescription",
-        "create",
-        req.ip!,
-        "failure",
-        { error: (error as Error).message }
-      );
-      res.status(500).json({ error: "Failed to create prescription" });
+      await this.auditService.logAccess(req.user!._id!.toString(), 'prescription', 'create', req.ip!, 'failure', {
+        error: (error as Error).message,
+      })
+      res.status(500).json({ error: 'Failed to create prescription' })
     }
-  };
+  }
 
   // FIXED: Proper patient prescription retrieval
-  getPrescriptionsByPatient = async (
-    req: AuthRequest,
-    res: Response
-  ): Promise<void> => {
+  getPrescriptionsByPatient = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const { patientId } = req.params;
-      const user = req.user!;
+      const { patientId } = req.params
+      const user = req.user!
 
-      console.log(
-        "Getting prescriptions for patient:",
-        patientId,
-        "by user:",
-        user._id,
-        "role:",
-        user.role
-      );
+      console.log('Getting prescriptions for patient (redacted)')
 
       // Check authorization
-      if (user.role === "patient" && user._id !== patientId) {
-        res.status(403).json({ error: "Access denied" });
-        return;
+      if (user.role === 'patient' && user._id !== patientId) {
+        res.status(403).json({ error: 'Access denied' })
+        return
       }
 
       // Use the correct method to get prescriptions
-      const prescriptions =
-        await this.medicalRecordService.getPrescriptionsByPatient(patientId);
+      const prescriptions = await this.medicalRecordService.getPrescriptionsByPatient(patientId)
 
-      console.log("Returning prescriptions:", prescriptions.length);
+      console.log('Returning prescriptions:', prescriptions.length)
 
-      await this.auditService.logAccess(
-        user._id!.toString(),
-        "prescriptions",
-        "view_patient",
-        req.ip!,
-        "success",
-        { patientId }
-      );
+      await this.auditService.logAccess(user._id!.toString(), 'prescriptions', 'view_patient', req.ip!, 'success', {
+        patientId,
+      })
 
-      res.json(prescriptions);
+      res.json(prescriptions)
     } catch (error) {
-      console.error("Error in getPrescriptionsByPatient:", error);
-      res.status(500).json({ error: "Failed to fetch prescriptions" });
+      console.error('Error in getPrescriptionsByPatient:', error)
+      res.status(500).json({ error: 'Failed to fetch prescriptions' })
     }
-  };
+  }
 }
