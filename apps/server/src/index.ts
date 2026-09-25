@@ -4,6 +4,7 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
+import mongoSanitize from "express-mongo-sanitize";
 
 // Import routes directly
 import { authRoutes } from "./routes/auth.js";
@@ -28,6 +29,9 @@ console.log("🔧 Setting up middleware...");
 app.use(helmet());
 app.use(cors());
 app.use(express.json());
+
+// Data sanitization against NoSQL query injection
+app.use(mongoSanitize() as unknown as express.RequestHandler);
 
 // Rate limiting
 const limiter = rateLimit({
