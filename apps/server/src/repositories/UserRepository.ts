@@ -42,6 +42,16 @@ export class UserRepository extends BaseRepository<IUser> {
     }
   }
 
+  async findByOAuthId(oauthProvider: string, oauthId: string): Promise<IUser | null> {
+    try {
+      const result = await this.model.findOne({ oauthProvider, oauthId });
+      return result ? result.toObject() : null;
+    } catch (error) {
+      console.error("Error in findByOAuthId:", error);
+      return null;
+    }
+  }
+
   async findPatientsByGuardian(guardianId: string): Promise<IPatient[]> {
     try {
       const results = await Patient.find({ dependents: guardianId });
