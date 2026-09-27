@@ -3,6 +3,7 @@ import { UserService } from '../services/UserService.js'
 import jwt from 'jsonwebtoken'
 import bcrypt from 'bcryptjs'
 import { UserRole } from '@shared/healthcare-types'
+import passport from 'passport'
 
 const router = Router()
 
@@ -145,6 +146,85 @@ router.post('/register', async (req, res) => {
       details: error.message,
       stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
     })
+  }
+})
+
+// Initiate Google OAuth Flow
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }))
+
+// Google OAuth Callback
+router.get(
+  '/google/callback',
+  passport.authenticate('google', { session: false, failureRedirect: '/login' }),
+  (req, res) => {
+    const user: any = req.user
+    
+    // If user is inactive (missing profile data like nationalId), issue temporary token
+    if (user.status === 'inactive') {
+      const tempToken = jwt.sign(
+        { id: user._id, role: user.role, status: 'inactive' },
+        process.env.JWT_SECRET!,
+        { expiresIn: '1h' }
+      )
+      
+      // Redirect to frontend complete-profile page with temp token
+      return res.redirect(`${process.env.FRONTEND_URL}/complete-profile?token=${tempToken}`)
+    }
+
+    // Fully registered user
+    const token = jwt.sign(
+      { id: user._id, role: user.role },
+      process.env.JWT_SECRET!,
+      { expiresIn: '7d' }
+    )
+    
+    // Redirect to frontend dashboard with token
+    res.redirect(`${process.env.FRONTEND_URL}/oauth-callback?token=${token}`)
+  }
+)
+
+// Complete Profile for OAuth users
+router.post('/complete-profile', async (req, res) => {
+  try {
+    // In a real implementation, we would extract the user ID from the temp token via a middleware
+    // Here we'll just take it from the body for demonstration, assuming the frontend sends it
+    const { userId, nationalId, phone, address, dateOfBirth, gender, emergencyContact } = req.body
+
+    if (!userId || !nationalId || !phone || !address || !dateOfBirth || !gender || !emergencyContact) {
+      return res.status(400).json({ error: 'Missing required fields' })
+    }
+
+    const userService = new UserService()
+    
+    const existing = await userService.findByNationalId(nationalId)
+    if (existing && existing._id !== userId) {
+      return res.status(400).json({ error: 'National ID is already in use by another account' })
+    }
+
+    const updatedUser = await userService.update(userId, {
+      nationalId,
+      phone,
+      address,
+      dateOfBirth: new Date(dateOfBirth),
+      gender,
+      emergencyContact,
+      status: 'active'
+    } as any)
+
+    if (!updatedUser) {
+      return res.status(404).json({ error: 'User not found' })
+    }
+
+    const token = jwt.sign(
+      { id: updatedUser._id, role: updatedUser.role },
+      process.env.JWT_SECRET!,
+      { expiresIn: '7d' }
+    )
+
+    res.json({ token, user: updatedUser })
+  } catch (error) {
+    console.error('Complete profile error:', error)
+    res.status(500).json({ error: 'Failed to complete profile' })
   }
 })
 

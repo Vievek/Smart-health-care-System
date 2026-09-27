@@ -13,6 +13,7 @@ import { appointmentRoutes } from "./routes/appointments.js";
 import { wardRoutes } from "./routes/wards.js";
 import { pharmacyRoutes } from "./routes/pharmacy.js";
 import { userRoutes } from "./routes/users.js";
+import passport from "./config/passport.js";
 
 console.log("🔧 Starting server initialization...");
 
@@ -29,9 +30,10 @@ console.log("🔧 Setting up middleware...");
 app.use(helmet());
 app.use(cors({ origin: process.env.FRONTEND_URL, credentials: true }));
 app.use(express.json());
+app.use(passport.initialize() as any);
 
 // Data sanitization against NoSQL query injection
-app.use(mongoSanitize() as unknown as express.RequestHandler);
+app.use(mongoSanitize() as any);
 
 // Rate limiting
 const limiter = rateLimit({
