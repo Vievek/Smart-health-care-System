@@ -94,35 +94,30 @@ export class MedicalRecordController {
         return;
       }
 
-      const pdfBuffer = await this.medicalRecordService.generateRecordPDF(
-        req.params.id
-      );
-
       await this.auditService.logAccess(
         req.user!._id!.toString(),
-        'medical_record',
-        'download_pdf',
+        "medical_record",
+        "view",
         req.ip!,
-        'success',
+        "success",
         { recordId: req.params.id }
-      )
+      );
 
-      res.setHeader('Content-Type', 'application/pdf')
-      res.setHeader('Content-Disposition', `attachment; filename=record-${req.params.id}.pdf`)
-      res.send(pdfBuffer)
+      res.json(record);
     } catch (error) {
       await this.auditService.logAccess(
         req.user!._id!.toString(),
-        'medical_record',
-        'download_pdf',
+        "medical_record",
+        "view",
         req.ip!,
-        'failure',
+        "failure",
         { error: (error as Error).message }
-      )
-      res.status(500).json({ error: 'Failed to generate PDF' })
+      );
+      res.status(500).json({ error: "Failed to fetch medical record" });
     }
-  }
+  };
 
+ 
   createPrescription = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const prescription = await this.medicalRecordService.createPrescription({
