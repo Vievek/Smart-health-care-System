@@ -9,6 +9,8 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Layout } from "./components/layout/Layout";
 import { Login } from "./components/auth/Login";
 import { Register } from "./components/auth/Register";
+import { OAuthCallback } from "./components/auth/OAuthCallback";
+import { CompleteProfile } from "./components/auth/CompleteProfile";
 import { MedicalRecordsDashboard } from "./components/medical-records/MedicalRecordsDashboard";
 import { AppointmentBooking } from "./components/appointments/AppointmentBooking";
 import { WardManagement } from "./components/wards/WardManagement";
@@ -66,6 +68,22 @@ const AppRoutes: React.FC = () => {
           element={
             <PublicRoute>
               <Register />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/oauth-callback"
+          element={
+            <PublicRoute>
+              <OAuthCallback />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/complete-profile"
+          element={
+            <PublicRoute>
+              <CompleteProfile />
             </PublicRoute>
           }
         />
