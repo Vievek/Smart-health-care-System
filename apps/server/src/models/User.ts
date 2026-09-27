@@ -46,13 +46,19 @@ export const User = mongoose.model<IUser>("User", userSchema);
 
 // Patient Schema
 const patientSchema = new Schema<IPatient>({
-  dateOfBirth: { type: Date, required: true },
+  dateOfBirth: { 
+    type: Date, 
+    required: function(this: any) { return this.status === 'active'; } 
+  },
   gender: {
     type: String,
     enum: ["male", "female", "other"],
-    required: true,
+    required: function(this: any) { return this.status === 'active'; },
   },
-  emergencyContact: { type: String, required: true },
+  emergencyContact: { 
+    type: String, 
+    required: function(this: any) { return this.status === 'active'; } 
+  },
   insuranceInfo: String,
   dependents: [{ type: String }],
 });

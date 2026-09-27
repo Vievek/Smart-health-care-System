@@ -4,6 +4,11 @@ import cors from "cors";
 import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import dotenv from "dotenv";
+
+// Load environment variables immediately so imports can use them
+dotenv.config();
+console.log("✅ Environment variables loaded");
+
 import mongoSanitize from "express-mongo-sanitize";
 
 // Import routes directly
@@ -16,10 +21,6 @@ import { userRoutes } from "./routes/users.js";
 import passport from "./config/passport.js";
 
 console.log("🔧 Starting server initialization...");
-
-// Load environment variables
-dotenv.config();
-console.log("✅ Environment variables loaded");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
