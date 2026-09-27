@@ -30,7 +30,7 @@ export const BedAllocationModal: React.FC<BedAllocationModalProps> = ({
         .toLowerCase()
         .includes(patientSearchTerm.toLowerCase()) ||
       patient.nationalId
-        .toLowerCase()
+        ?.toLowerCase()
         .includes(patientSearchTerm.toLowerCase()) ||
       patient._id?.toLowerCase().includes(patientSearchTerm.toLowerCase())
   );

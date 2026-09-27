@@ -15,9 +15,9 @@ import {
 // Base User Schema
 const userSchema = new Schema<IUser>(
   {
-    nationalId: { type: String, required: true, unique: true },
+    nationalId: { type: String, required: false, unique: true, sparse: true },
     email: { type: String, required: true, unique: true },
-    phone: { type: String, required: true },
+    phone: { type: String, required: false },
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
     role: {
@@ -30,8 +30,10 @@ const userSchema = new Schema<IUser>(
       enum: Object.values(UserStatus),
       default: UserStatus.ACTIVE,
     },
-    passwordHash: { type: String, required: true, select: false },
-    address: { type: String, required: true },
+    passwordHash: { type: String, required: false, select: false },
+    address: { type: String, required: false },
+    oauthProvider: { type: String, enum: ['google', 'microsoft', 'apple'], required: false },
+    oauthId: { type: String, required: false, unique: true, sparse: true },
   },
   {
     timestamps: true,

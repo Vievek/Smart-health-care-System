@@ -36,7 +36,7 @@ export class UserService implements IService<IUser> {
   ): Promise<IUser | null> {
     const user =
       await this.userRepository.findByNationalIdWithPassword(nationalId);
-    if (!user) return null;
+    if (!user || !user.passwordHash) return null;
 
     const isValid = await bcrypt.compare(password, user.passwordHash);
     return isValid ? user : null;

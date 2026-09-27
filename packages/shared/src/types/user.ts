@@ -16,15 +16,17 @@ export enum UserStatus {
 
 export interface IUser {
   _id?: string;
-  nationalId: string;
+  nationalId?: string;
   email: string;
-  phone: string;
+  phone?: string;
   firstName: string;
   lastName: string;
   role: UserRole;
   status: UserStatus;
-  passwordHash: string;
-  address: string;
+  passwordHash?: string;
+  address?: string;
+  oauthProvider?: 'google' | 'microsoft' | 'apple';
+  oauthId?: string;
   createdAt?: Date;
   updatedAt?: Date;
 }

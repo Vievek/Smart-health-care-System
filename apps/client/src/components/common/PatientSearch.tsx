@@ -35,7 +35,7 @@ export const PatientSearch: React.FC<PatientSearchProps> = ({
     return (
       patient.firstName.toLowerCase().includes(searchLower) ||
       patient.lastName.toLowerCase().includes(searchLower) ||
-      patient.nationalId.toLowerCase().includes(searchLower) ||
+      patient.nationalId?.toLowerCase().includes(searchLower) ||
       patient._id?.toLowerCase().includes(searchLower)
     );
   });
