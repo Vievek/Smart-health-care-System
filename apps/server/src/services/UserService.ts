@@ -40,7 +40,8 @@ export class UserService implements IService<IUser> {
     nationalId: string,
     password: string
   ): Promise<IUser | null> {
-    const user = await this.userRepository.findByNationalId(nationalId);
+    const user =
+      await this.userRepository.findByNationalIdWithPassword(nationalId);
     if (!user) return null;
 
     const isValid = await bcrypt.compare(password, user.passwordHash);

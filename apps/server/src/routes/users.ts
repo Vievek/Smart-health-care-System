@@ -1,11 +1,11 @@
 import { Router } from "express";
 import { UserService } from "../services/UserService.js";
-import { authenticate } from "../middleware/auth.js";
+import { authenticate, authorize } from "../middleware/auth.js";
 
 const router = Router();
 const userService = new UserService();
 
-router.get("/", authenticate, async (_req, res) => {
+router.get("/", authenticate, authorize("admin"), async (_req, res) => {
   try {
     const users = await userService.getAll();
     res.json(users);

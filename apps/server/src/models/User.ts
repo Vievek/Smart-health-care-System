@@ -30,7 +30,7 @@ const userSchema = new Schema<IUser>(
       enum: Object.values(UserStatus),
       default: UserStatus.ACTIVE,
     },
-    passwordHash: { type: String, required: true },
+    passwordHash: { type: String, required: true, select: false },
     address: { type: String, required: true },
   },
   {
