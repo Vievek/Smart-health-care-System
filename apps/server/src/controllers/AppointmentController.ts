@@ -1,170 +1,158 @@
-import { Response } from "express";
-import { AppointmentService } from "../services/AppointmentService";
-import { AuditService } from "../services/AuditService";
-import { AuthRequest } from "../middleware/auth";
+import { Response } from 'express'
+import { AppointmentService } from '../services/AppointmentService'
+import { AuditService } from '../services/AuditService'
+import { AuthRequest } from '../middleware/auth'
 
 export class AppointmentController {
-  private appointmentService: AppointmentService;
-  private auditService: AuditService;
+  private appointmentService: AppointmentService
+  private auditService: AuditService
 
   constructor() {
-    this.appointmentService = new AppointmentService();
-    this.auditService = new AuditService();
+    this.appointmentService = new AppointmentService()
+    this.auditService = new AuditService()
   }
 
-  createAppointment = async (
-    req: AuthRequest,
-    res: Response
-  ): Promise<void> => {
+  createAppointment = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const appointment = await this.appointmentService.create({
         ...req.body,
-        patientId:
-          req.user!.role === "patient" ? req.user!._id : req.body.patientId,
-      });
+        patientId: req.user!.role === 'patient' ? req.user!._id : req.body.patientId,
+      })
 
-      await this.auditService.logAccess(
-        req.user!._id!.toString(),
-        "appointment",
-        "create",
-        req.ip!,
-        "success",
-        { appointmentId: appointment._id }
-      );
+      await this.auditService.logAccess(req.user!._id!.toString(), 'appointment', 'create', req.ip!, 'success', {
+        appointmentId: appointment._id,
+      })
 
-      res.status(201).json(appointment);
+      res.status(201).json(appointment)
     } catch (error) {
-      await this.auditService.logAccess(
-        req.user!._id!.toString(),
-        "appointment",
-        "create",
-        req.ip!,
-        "failure",
-        { error: (error as Error).message }
-      );
-      res.status(400).json({ error: (error as Error).message });
+      await this.auditService.logAccess(req.user!._id!.toString(), 'appointment', 'create', req.ip!, 'failure', {
+        error: (error as Error).message,
+      })
+      res.status(400).json({ error: (error as Error).message })
     }
-  };
+  }
 
   getAppointments = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      let appointments;
-      const user = req.user!;
+      let appointments
+      const user = req.user!
 
-      if (user.role === "patient") {
-        appointments = await this.appointmentService.getPatientAppointments(
-          user._id!.toString()
-        );
-      } else if (user.role === "doctor") {
-        appointments = await this.appointmentService.getDoctorAppointments(
-          user._id!.toString()
-        );
+      if (user.role === 'patient') {
+        appointments = await this.appointmentService.getPatientAppointments(user._id!.toString())
+      } else if (user.role === 'doctor') {
+        appointments = await this.appointmentService.getDoctorAppointments(user._id!.toString())
       } else {
-        appointments = await this.appointmentService.getAll(req.query);
+        appointments = await this.appointmentService.getAll(req.query)
       }
 
-      await this.auditService.logAccess(
-        user._id!.toString(),
-        "appointments",
-        "view_list",
-        req.ip!,
-        "success"
-      );
+      await this.auditService.logAccess(user._id!.toString(), 'appointments', 'view_list', req.ip!, 'success')
 
-      res.json(appointments);
+      res.json(appointments)
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch appointments" });
+      res.status(500).json({ error: 'Failed to fetch appointments' })
     }
-  };
+  }
 
-  cancelAppointment = async (
-    req: AuthRequest,
-    res: Response
-  ): Promise<void> => {
+  cancelAppointment = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const appointment = await this.appointmentService.cancelAppointment(
-        req.params.id
-      );
+      const existingAppointment = await this.appointmentService.getById(req.params.id)
+
+      if (!existingAppointment) {
+        res.status(404).json({ error: 'Appointment not found' })
+        return
+      }
+
+      const user = req.user!
+      if (user.role === 'patient' && existingAppointment.patientId !== user._id) {
+        res.status(403).json({ error: 'Access denied' })
+        return
+      }
+
+      if (user.role === 'doctor' && existingAppointment.doctorId !== user._id) {
+        res.status(403).json({ error: 'Access denied' })
+        return
+      }
+
+      const appointment = await this.appointmentService.cancelAppointment(req.params.id)
 
       if (!appointment) {
-        res.status(404).json({ error: "Appointment not found" });
-        return;
+        res.status(404).json({ error: 'Appointment not found' })
+        return
       }
 
-      await this.auditService.logAccess(
-        req.user!._id!.toString(),
-        "appointment",
-        "cancel",
-        req.ip!,
-        "success",
-        { appointmentId: req.params.id }
-      );
+      await this.auditService.logAccess(req.user!._id!.toString(), 'appointment', 'cancel', req.ip!, 'success', {
+        appointmentId: req.params.id,
+      })
 
-      res.json(appointment);
+      res.json(appointment)
     } catch (error) {
-      res.status(500).json({ error: "Failed to cancel appointment" });
+      res.status(500).json({ error: 'Failed to cancel appointment' })
     }
-  };
+  }
 
-  rescheduleAppointment = async (
-    req: AuthRequest,
-    res: Response
-  ): Promise<void> => {
+  rescheduleAppointment = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const { newDateTime } = req.body;
-      const appointment = await this.appointmentService.rescheduleAppointment(
-        req.params.id,
-        new Date(newDateTime)
-      );
+      const existingAppointment = await this.appointmentService.getById(req.params.id)
+
+      if (!existingAppointment) {
+        res.status(404).json({ error: 'Appointment not found' })
+        return
+      }
+
+      const user = req.user!
+      if (user.role === 'patient' && existingAppointment.patientId !== user._id) {
+        res.status(403).json({ error: 'Access denied' })
+        return
+      }
+
+      if (user.role === 'doctor' && existingAppointment.doctorId !== user._id) {
+        res.status(403).json({ error: 'Access denied' })
+        return
+      }
+
+      const { newDateTime } = req.body
+      const appointment = await this.appointmentService.rescheduleAppointment(req.params.id, new Date(newDateTime))
 
       if (!appointment) {
-        res.status(404).json({ error: "Appointment not found" });
-        return;
+        res.status(404).json({ error: 'Appointment not found' })
+        return
       }
 
-      await this.auditService.logAccess(
-        req.user!._id!.toString(),
-        "appointment",
-        "reschedule",
-        req.ip!,
-        "success",
-        { appointmentId: req.params.id }
-      );
+      await this.auditService.logAccess(req.user!._id!.toString(), 'appointment', 'reschedule', req.ip!, 'success', {
+        appointmentId: req.params.id,
+      })
 
-      res.json(appointment);
+      res.json(appointment)
     } catch (error) {
-      res.status(400).json({ error: (error as Error).message });
+      res.status(400).json({ error: (error as Error).message })
     }
-  };
+  }
 
   // New method to get appointment by ID
-  getAppointmentById = async (
-    req: AuthRequest,
-    res: Response
-  ): Promise<void> => {
+  getAppointmentById = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const appointment = await this.appointmentService.getById(req.params.id);
+      const appointment = await this.appointmentService.getById(req.params.id)
 
       if (!appointment) {
-        res.status(404).json({ error: "Appointment not found" });
-        return;
+        res.status(404).json({ error: 'Appointment not found' })
+        return
       }
 
       // Check if user has access to this appointment
-      const user = req.user!;
-      if (user.role === "patient" && appointment.patientId !== user._id) {
-        res.status(403).json({ error: "Access denied" });
-        return;
+      const user = req.user!
+      if (user.role === 'patient' && appointment.patientId !== user._id) {
+        res.status(403).json({ error: 'Access denied' })
+        return
       }
 
-      if (user.role === "doctor" && appointment.doctorId !== user._id) {
-        res.status(403).json({ error: "Access denied" });
-        return;
+      if (user.role === 'doctor' && appointment.doctorId !== user._id) {
+        res.status(403).json({ error: 'Access denied' })
+        return
       }
 
-      res.json(appointment);
+      res.json(appointment)
     } catch (error) {
-      res.status(500).json({ error: "Failed to fetch appointment" });
+      res.status(500).json({ error: 'Failed to fetch appointment' })
     }
-  };
+  }
 }
