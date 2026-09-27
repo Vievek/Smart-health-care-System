@@ -49,7 +49,18 @@ export class MedicalRecordController {
 
       if (!record) {
         res.status(404).json({ error: 'Record not found' })
-        return
+        return;
+      }
+
+    
+
+      const user = req.user!;
+      if (
+        user.role === "patient" &&
+        record.patientId?.toString() !== user._id?.toString()
+      ) {
+        res.status(403).json({ error: "Access denied" });
+        return;
       }
 
       await this.auditService.logAccess(req.user!._id!.toString(), 'medical_record', 'view', req.ip!, 'success', {
@@ -67,33 +78,46 @@ export class MedicalRecordController {
 
   downloadRecordPDF = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
-      const pdfBuffer = await this.medicalRecordService.generateRecordPDF(req.params.id)
+      const record = await this.medicalRecordService.getById(req.params.id);
+      
+      if (!record) {
+        res.status(404).json({ error: "Record not found" });
+        return;
+      }
+
+      const user = req.user!;
+      if (
+        user.role === "patient" &&
+        record.patientId?.toString() !== user._id?.toString()
+      ) {
+        res.status(403).json({ error: "Access denied" });
+        return;
+      }
 
       await this.auditService.logAccess(
         req.user!._id!.toString(),
-        'medical_record',
-        'download_pdf',
+        "medical_record",
+        "view",
         req.ip!,
-        'success',
+        "success",
         { recordId: req.params.id }
-      )
+      );
 
-      res.setHeader('Content-Type', 'application/pdf')
-      res.setHeader('Content-Disposition', `attachment; filename=record-${req.params.id}.pdf`)
-      res.send(pdfBuffer)
+      res.json(record);
     } catch (error) {
       await this.auditService.logAccess(
         req.user!._id!.toString(),
-        'medical_record',
-        'download_pdf',
+        "medical_record",
+        "view",
         req.ip!,
-        'failure',
+        "failure",
         { error: (error as Error).message }
-      )
-      res.status(500).json({ error: 'Failed to generate PDF' })
+      );
+      res.status(500).json({ error: "Failed to fetch medical record" });
     }
-  }
+  };
 
+ 
   createPrescription = async (req: AuthRequest, res: Response): Promise<void> => {
     try {
       const prescription = await this.medicalRecordService.createPrescription({
