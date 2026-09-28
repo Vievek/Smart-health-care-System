@@ -15,44 +15,69 @@ export const WardManagement: React.FC = () => {
   const [patientBeds, setPatientBeds] = useState<IBed[]>([]);
   const [patients, setPatients] = useState<IUser[]>([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const { user } = useAuth();
   const wardService = new WardService();
   const userService = new UserService();
 
-  // Load all data
+  // FIXED: Proper error handling for service calls
   const loadAllData = async () => {
     setLoading(true);
+    setError(null);
     try {
-      // Load wards, beds, and patients in parallel
+      // Load data with proper error handling for each service call
       const [wardsData, availableBedsData, allBedsData, allUsers] =
-        await Promise.all([
+        await Promise.allSettled([
           wardService.getWards(),
           wardService.getAvailableBeds(),
           wardService.getAllBeds(),
           userService.getAll(),
         ]);
 
-      setWards(wardsData);
-      setAvailableBeds(availableBedsData);
-      setAllBeds(allBedsData);
+      // Handle each promise result
+      const wardsResult =
+        wardsData.status === "fulfilled" ? wardsData.value : [];
+      const availableBedsResult =
+        availableBedsData.status === "fulfilled" ? availableBedsData.value : [];
+      const allBedsResult =
+        allBedsData.status === "fulfilled" ? allBedsData.value : [];
+      const allUsersResult =
+        allUsers.status === "fulfilled" ? allUsers.value : [];
+
+      setWards(wardsResult || []);
+      setAvailableBeds(availableBedsResult || []);
+      setAllBeds(allBedsResult || []);
 
       // Set patients (filter for patient role)
-      const patientUsers = allUsers.filter((p) => p.role === UserRole.PATIENT);
+      const patientUsers = (allUsersResult || []).filter(
+        (p) => p.role === UserRole.PATIENT
+      );
       setPatients(patientUsers);
 
       // Set initial selected ward
-      if (wardsData.length > 0 && !selectedWard) {
-        setSelectedWard(wardsData[0]);
+      if (wardsResult && wardsResult.length > 0 && !selectedWard) {
+        setSelectedWard(wardsResult[0]);
       }
 
       // Load patient beds if user is a patient
       if (user?.role === UserRole.PATIENT && user._id) {
-        const patientBedData = await wardService.getBedsByPatient(user._id);
-        setPatientBeds(patientBedData);
+        try {
+          const patientBedData = await wardService.getBedsByPatient(user._id);
+          setPatientBeds(patientBedData || []);
+        } catch (error) {
+          console.error("Failed to load patient beds:", error);
+          setPatientBeds([]);
+        }
       }
     } catch (error) {
       console.error("Failed to load ward data:", error);
+      setError("Failed to load ward data. Please try again.");
+      // Set empty arrays to prevent undefined errors
+      setWards([]);
+      setAvailableBeds([]);
+      setAllBeds([]);
+      setPatients([]);
     } finally {
       setLoading(false);
     }
@@ -66,7 +91,7 @@ export const WardManagement: React.FC = () => {
     await loadAllData();
   };
 
-  // FIXED: Get patient name function
+  // Get patient name function with null checks
   const getPatientName = (patientId: string) => {
     const patient = patients.find((p) => p._id === patientId);
     return patient
@@ -74,9 +99,9 @@ export const WardManagement: React.FC = () => {
       : `Patient ${patientId}`;
   };
 
-  // FIXED: Get beds for specific ward
+  // Get beds for specific ward with null checks
   const getBedsForWard = (wardId: string) => {
-    return allBeds.filter((bed) => bed.wardId === wardId);
+    return (allBeds || []).filter((bed) => bed.wardId === wardId);
   };
 
   if (loading && wards.length === 0) {
@@ -84,6 +109,22 @@ export const WardManagement: React.FC = () => {
       <div className="container mx-auto p-6">
         <div className="flex justify-center items-center h-64">
           Loading ward data...
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-700">{error}</p>
+          <button
+            onClick={loadAllData}
+            className="mt-2 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Retry
+          </button>
         </div>
       </div>
     );

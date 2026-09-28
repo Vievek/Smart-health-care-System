@@ -15,9 +15,9 @@ import {
 // Base User Schema
 const userSchema = new Schema<IUser>(
   {
-    nationalId: { type: String, required: true, unique: true },
+    nationalId: { type: String, required: false, unique: true, sparse: true },
     email: { type: String, required: true, unique: true },
-    phone: { type: String, required: true },
+    phone: { type: String, required: false },
     firstName: { type: String, required: true },
     lastName: { type: String, required: true },
     role: {
@@ -30,8 +30,10 @@ const userSchema = new Schema<IUser>(
       enum: Object.values(UserStatus),
       default: UserStatus.ACTIVE,
     },
-    passwordHash: { type: String, required: true },
-    address: { type: String, required: true },
+    passwordHash: { type: String, required: false, select: false },
+    address: { type: String, required: false },
+    oauthProvider: { type: String, enum: ['google', 'microsoft', 'apple'], required: false },
+    oauthId: { type: String, required: false, unique: true, sparse: true },
   },
   {
     timestamps: true,
@@ -44,13 +46,19 @@ export const User = mongoose.model<IUser>("User", userSchema);
 
 // Patient Schema
 const patientSchema = new Schema<IPatient>({
-  dateOfBirth: { type: Date, required: true },
+  dateOfBirth: { 
+    type: Date, 
+    required: function(this: any) { return this.status === 'active'; } 
+  },
   gender: {
     type: String,
     enum: ["male", "female", "other"],
-    required: true,
+    required: function(this: any) { return this.status === 'active'; },
   },
-  emergencyContact: { type: String, required: true },
+  emergencyContact: { 
+    type: String, 
+    required: function(this: any) { return this.status === 'active'; } 
+  },
   insuranceInfo: String,
   dependents: [{ type: String }],
 });

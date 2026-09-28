@@ -9,10 +9,13 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import { Layout } from "./components/layout/Layout";
 import { Login } from "./components/auth/Login";
 import { Register } from "./components/auth/Register";
+import { OAuthCallback } from "./components/auth/OAuthCallback";
+import { CompleteProfile } from "./components/auth/CompleteProfile";
 import { MedicalRecordsDashboard } from "./components/medical-records/MedicalRecordsDashboard";
 import { AppointmentBooking } from "./components/appointments/AppointmentBooking";
 import { WardManagement } from "./components/wards/WardManagement";
 import { PharmacyDispensing } from "./components/pharmacy/PharmacyDispensing";
+import { StaffManagement } from "./components/admin/StaffManagement";
 
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({
   children,
@@ -69,6 +72,22 @@ const AppRoutes: React.FC = () => {
           }
         />
         <Route
+          path="/oauth-callback"
+          element={
+            <PublicRoute>
+              <OAuthCallback />
+            </PublicRoute>
+          }
+        />
+        <Route
+          path="/complete-profile"
+          element={
+            <PublicRoute>
+              <CompleteProfile />
+            </PublicRoute>
+          }
+        />
+        <Route
           path="/medical-records"
           element={
             <ProtectedRoute>
@@ -97,6 +116,14 @@ const AppRoutes: React.FC = () => {
           element={
             <ProtectedRoute>
               <PharmacyDispensing />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/staff-management"
+          element={
+            <ProtectedRoute>
+              <StaffManagement />
             </ProtectedRoute>
           }
         />

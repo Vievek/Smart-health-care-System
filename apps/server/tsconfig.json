@@ -15,9 +15,10 @@
       "@shared/*": ["../../packages/shared/src/*"]
     },
     "resolveJsonModule": true,
-    "typeRoots": ["./src/types", "./node_modules/@types"]
+    "typeRoots": ["./src/types", "./node_modules/@types"],
+    "types": ["node"] // Remove "jest" from here
   },
-  "include": ["src/**/*"],
+  "include": ["src/**/*", "src/**/*.ts"],
   "exclude": ["node_modules", "dist"],
   "ts-node": {
     "esm": true,

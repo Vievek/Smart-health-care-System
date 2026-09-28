@@ -19,16 +19,10 @@ export class UserService implements IService<IUser> {
   }
 
   async create(data: Partial<IUser>): Promise<IUser> {
-    if (data.passwordHash) {
-      data.passwordHash = await bcrypt.hash(data.passwordHash, 12);
-    }
     return this.userRepository.create(data);
   }
 
   async update(id: string, data: Partial<IUser>): Promise<IUser | null> {
-    if (data.passwordHash) {
-      data.passwordHash = await bcrypt.hash(data.passwordHash, 12);
-    }
     return this.userRepository.update(id, data);
   }
 
@@ -40,8 +34,9 @@ export class UserService implements IService<IUser> {
     nationalId: string,
     password: string
   ): Promise<IUser | null> {
-    const user = await this.userRepository.findByNationalId(nationalId);
-    if (!user) return null;
+    const user =
+      await this.userRepository.findByNationalIdWithPassword(nationalId);
+    if (!user || !user.passwordHash) return null;
 
     const isValid = await bcrypt.compare(password, user.passwordHash);
     return isValid ? user : null;
@@ -53,6 +48,27 @@ export class UserService implements IService<IUser> {
 
   async findByEmail(email: string): Promise<IUser | null> {
     return this.userRepository.findByEmail(email);
+  }
+
+  async findByOAuthId(oauthProvider: string, oauthId: string): Promise<IUser | null> {
+    return this.userRepository.findByOAuthId(oauthProvider, oauthId);
+  }
+
+  async createFromOAuth(profile: any): Promise<IUser> {
+    const email = profile.emails[0].value;
+    const firstName = profile.name?.givenName || profile.displayName?.split(" ")[0] || "Unknown";
+    const lastName = profile.name?.familyName || profile.displayName?.split(" ").slice(1).join(" ") || "Unknown";
+    
+    // Create an inactive or pending user by default until profile is complete
+    return this.create({
+      email,
+      firstName,
+      lastName,
+      oauthProvider: profile.provider,
+      oauthId: profile.id,
+      role: UserRole.PATIENT, // default role for public registration
+      status: "inactive" as any, // "inactive" indicates missing profile data
+    });
   }
 
   async createTemporaryJudicialAccess(judicialData: any): Promise<IUser> {

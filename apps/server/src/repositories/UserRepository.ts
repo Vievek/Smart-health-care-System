@@ -17,12 +17,37 @@ export class UserRepository extends BaseRepository<IUser> {
     }
   }
 
+  // passwordHash is select:false on the schema; only use this for credential checks
+  async findByNationalIdWithPassword(
+    nationalId: string
+  ): Promise<IUser | null> {
+    try {
+      const result = await this.model
+        .findOne({ nationalId })
+        .select("+passwordHash");
+      return result ? result.toObject() : null;
+    } catch (error) {
+      console.error("Error in findByNationalIdWithPassword:", error);
+      return null;
+    }
+  }
+
   async findByEmail(email: string): Promise<IUser | null> {
     try {
       const result = await this.model.findOne({ email });
       return result ? result.toObject() : null;
     } catch (error) {
       console.error("Error in findByEmail:", error);
+      return null;
+    }
+  }
+
+  async findByOAuthId(oauthProvider: string, oauthId: string): Promise<IUser | null> {
+    try {
+      const result = await this.model.findOne({ oauthProvider, oauthId });
+      return result ? result.toObject() : null;
+    } catch (error) {
+      console.error("Error in findByOAuthId:", error);
       return null;
     }
   }

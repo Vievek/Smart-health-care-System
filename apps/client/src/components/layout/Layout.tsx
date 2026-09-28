@@ -39,6 +39,12 @@ export const Layout: React.FC<LayoutProps> = ({ children }) => {
         icon: Pill,
         roles: ["pharmacist", "admin"],
       },
+      {
+        name: "Staff Management",
+        href: "/staff-management",
+        icon: User,
+        roles: ["admin"],
+      },
     ];
 
     return baseNav.filter(
