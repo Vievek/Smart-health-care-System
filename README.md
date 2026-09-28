@@ -17,7 +17,7 @@ Modified project (security fixes and OAuth implementation): Baranch - SSD-final
 https://github.com/Vievek/Smart-health-care-System
 
 VIDEO DEMONSTRATION
-YouTube link: https://youtu.be/gCHb4ZDFSVw
+YouTube link: https://youtu.be/riv7iyFIJMA
 Duration: 21 minutes 15 seconds
 
 SUBMISSION CONTENTS
